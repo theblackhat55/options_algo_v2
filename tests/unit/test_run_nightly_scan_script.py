@@ -25,13 +25,24 @@ def test_run_nightly_scan_returns_json_path(
     assert "strategy_type_counts" in payload["summary"]
 
 
-def test_run_nightly_scan_live_mode_not_implemented(
+def test_run_nightly_scan_live_mode_requires_databento_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("OPTIONS_ALGO_RUNTIME_MODE", "live")
+    monkeypatch.delenv("DATABENTO_API_KEY", raising=False)
+
+    with pytest.raises(ValueError, match="DATABENTO_API_KEY"):
+        run_nightly_scan()
+
+
+def test_run_nightly_scan_live_mode_not_implemented_with_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPTIONS_ALGO_RUNTIME_MODE", "live")
+    monkeypatch.setenv("DATABENTO_API_KEY", "test-key")
 
     with pytest.raises(
         NotImplementedError,
-        match="live underlying fetcher is not wired yet",
+        match="live databento fetcher is not implemented",
     ):
         run_nightly_scan()

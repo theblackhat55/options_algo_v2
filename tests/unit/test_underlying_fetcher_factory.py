@@ -31,10 +31,23 @@ def test_build_underlying_fetcher_returns_mock_fetcher_in_mock_mode(
     assert payload["timestamp"] == "2026-03-10T21:00:00Z"
 
 
-def test_build_underlying_fetcher_raises_in_live_mode(
+def test_build_underlying_fetcher_raises_when_live_mode_missing_api_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("OPTIONS_ALGO_RUNTIME_MODE", "live")
+    monkeypatch.delenv("DATABENTO_API_KEY", raising=False)
 
-    with pytest.raises(NotImplementedError, match="live underlying fetcher"):
+    with pytest.raises(ValueError, match="DATABENTO_API_KEY"):
         build_underlying_fetcher()
+
+
+def test_build_underlying_fetcher_returns_live_callable_when_key_present(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPTIONS_ALGO_RUNTIME_MODE", "live")
+    monkeypatch.setenv("DATABENTO_API_KEY", "test-key")
+
+    fetcher = build_underlying_fetcher()
+
+    with pytest.raises(NotImplementedError, match="live databento fetcher"):
+        fetcher("AAPL")
