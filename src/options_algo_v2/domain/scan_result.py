@@ -22,4 +22,5 @@ class ScanResult:
     config_versions: dict[str, str]
     summary: ScanSummary
     runtime_metadata: dict[str, object] = field(default_factory=dict)
+    feature_sources: list[dict[str, str]] = field(default_factory=list)
     decisions: list[dict[str, object]] = field(default_factory=list)

@@ -95,6 +95,7 @@ def test_build_scan_result_returns_expected_structure() -> None:
     }
     assert result.runtime_metadata["historical_row_provider"] == "mock"
     assert result.runtime_metadata["market_breadth_provider"] == "mock"
+    assert result.runtime_metadata["market_breadth_provider_source"] == "mock"
     assert result.summary.total_candidates == 2
     assert result.summary.rejection_reason_counts == {
         "market regime does not permit new entries": 1,

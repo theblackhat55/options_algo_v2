@@ -14,11 +14,15 @@ from options_algo_v2.services.decision_diagnostics import (
     count_strategy_types,
 )
 from options_algo_v2.services.decision_serializer import serialize_candidate_decision
+from options_algo_v2.services.feature_source_metadata_builder import (
+    build_feature_source_metadata,
+)
 from options_algo_v2.services.historical_row_provider_factory import (
     get_historical_row_provider_name,
 )
 from options_algo_v2.services.market_breadth_provider_factory import (
     get_market_breadth_provider_name,
+    get_market_breadth_provider_source,
 )
 from options_algo_v2.services.runtime_mode import get_runtime_mode
 
@@ -54,13 +58,29 @@ def build_scan_result(
 
     generated_at = datetime.now(UTC).isoformat()
     summary = build_scan_summary(decisions)
-    serialized_decisions = [serialize_candidate_decision(decision) for decision in decisions]
+    serialized_decisions = [
+        serialize_candidate_decision(decision) for decision in decisions
+    ]
+    feature_sources = [
+        {
+            "symbol": metadata.symbol,
+            "historical_row_provider": metadata.historical_row_provider,
+            "market_breadth_provider": metadata.market_breadth_provider,
+            "dataset": metadata.dataset,
+            "schema": metadata.schema,
+        }
+        for metadata in (
+            build_feature_source_metadata(symbol=decision.candidate.symbol)
+            for decision in decisions
+        )
+    ]
 
     runtime_metadata: dict[str, object] = {
         "runtime_mode": get_runtime_mode(),
         "databento": build_databento_runtime_info(),
         "historical_row_provider": get_historical_row_provider_name(),
         "market_breadth_provider": get_market_breadth_provider_name(),
+        "market_breadth_provider_source": get_market_breadth_provider_source(),
     }
 
     return ScanResult(
@@ -69,5 +89,6 @@ def build_scan_result(
         config_versions=config_versions,
         summary=summary,
         runtime_metadata=runtime_metadata,
+        feature_sources=feature_sources,
         decisions=serialized_decisions,
     )
