@@ -4,6 +4,7 @@ from options_algo_v2.adapters.databento_underlying import (
     DatabentoUnderlyingAdapter,
 )
 from options_algo_v2.services.batch_evaluator import evaluate_raw_feature_batch
+from options_algo_v2.services.runtime_mode import get_runtime_mode
 from options_algo_v2.services.sample_feature_factory import (
     build_sample_raw_features_from_snapshot,
 )
@@ -34,6 +35,11 @@ def fake_underlying_fetcher(symbol: str) -> dict[str, object]:
 
 
 def run_nightly_scan() -> str:
+    runtime_mode = get_runtime_mode()
+
+    if runtime_mode == "live":
+        raise NotImplementedError("live runtime mode is not wired yet")
+
     symbols = load_universe_symbols()
     adapter = DatabentoUnderlyingAdapter(fetcher=fake_underlying_fetcher)
 
