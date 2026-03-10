@@ -1,4 +1,5 @@
 import sys
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -83,6 +84,40 @@ def test_databento_sdk_wrapper_parses_last_row(
         "volume": 1_250_000.0,
         "timestamp": "2026-03-10T21:00:00Z",
     }
+
+
+def test_databento_sdk_wrapper_normalizes_datetime_timestamp(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeResponse:
+        def to_list(self) -> list[dict[str, object]]:
+            return [
+                {
+                    "close": 101.5,
+                    "volume": 1_250_000,
+                    "ts_event": datetime(2026, 3, 10, 21, 0, tzinfo=UTC),
+                }
+            ]
+
+    class FakeTimeseries:
+        def get_range(self, **kwargs: object) -> FakeResponse:
+            return FakeResponse()
+
+    class FakeHistorical:
+        def __init__(self, api_key: str) -> None:
+            self.timeseries = FakeTimeseries()
+
+    fake_module = SimpleNamespace(Historical=FakeHistorical)
+    monkeypatch.setitem(sys.modules, "databento", fake_module)
+
+    wrapper = DatabentoHistoricalClientWrapper(api_key="test-key")
+    payload = wrapper.get_underlying_snapshot(
+        symbol="AAPL",
+        dataset="XNAS.ITCH",
+        schema="ohlcv-1d",
+    )
+
+    assert payload["timestamp"] == "2026-03-10T21:00:00Z"
 
 
 def test_databento_sdk_wrapper_raises_when_no_rows(
@@ -191,6 +226,34 @@ def test_databento_sdk_wrapper_raises_when_timestamp_missing(
     wrapper = DatabentoHistoricalClientWrapper(api_key="test-key")
 
     with pytest.raises(ValueError, match="missing 'ts_event'"):
+        wrapper.get_underlying_snapshot(
+            symbol="AAPL",
+            dataset="XNAS.ITCH",
+            schema="ohlcv-1d",
+        )
+
+
+def test_databento_sdk_wrapper_raises_when_timestamp_invalid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeResponse:
+        def to_list(self) -> list[dict[str, object]]:
+            return [{"close": 101.5, "volume": 1_000_000, "ts_event": "bad"}]
+
+    class FakeTimeseries:
+        def get_range(self, **kwargs: object) -> FakeResponse:
+            return FakeResponse()
+
+    class FakeHistorical:
+        def __init__(self, api_key: str) -> None:
+            self.timeseries = FakeTimeseries()
+
+    fake_module = SimpleNamespace(Historical=FakeHistorical)
+    monkeypatch.setitem(sys.modules, "databento", fake_module)
+
+    wrapper = DatabentoHistoricalClientWrapper(api_key="test-key")
+
+    with pytest.raises(ValueError, match="invalid 'ts_event' value"):
         wrapper.get_underlying_snapshot(
             symbol="AAPL",
             dataset="XNAS.ITCH",

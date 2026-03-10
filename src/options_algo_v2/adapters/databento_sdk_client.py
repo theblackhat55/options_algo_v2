@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from types import ModuleType
 from typing import Protocol, cast
 
@@ -58,6 +59,35 @@ def _parse_non_negative_volume(value: object) -> float:
     return parsed
 
 
+def _parse_timestamp(value: object) -> str:
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            normalized = value.replace(tzinfo=UTC)
+        else:
+            normalized = value.astimezone(UTC)
+        return normalized.isoformat().replace("+00:00", "Z")
+
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            raise ValueError("invalid 'ts_event' value in databento row")
+
+        normalized_input = raw.replace("Z", "+00:00")
+        try:
+            parsed = datetime.fromisoformat(normalized_input)
+        except ValueError as exc:
+            raise ValueError("invalid 'ts_event' value in databento row") from exc
+
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        else:
+            parsed = parsed.astimezone(UTC)
+
+        return parsed.isoformat().replace("+00:00", "Z")
+
+    raise ValueError("invalid 'ts_event' value in databento row")
+
+
 @dataclass(frozen=True)
 class DatabentoHistoricalClientWrapper:
     api_key: str
@@ -92,5 +122,5 @@ class DatabentoHistoricalClientWrapper:
         return {
             "close": _parse_positive_close(close_value),
             "volume": _parse_non_negative_volume(volume_value),
-            "timestamp": str(timestamp_value),
+            "timestamp": _parse_timestamp(timestamp_value),
         }
