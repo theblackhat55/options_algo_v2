@@ -33,6 +33,9 @@ from options_algo_v2.services.runtime_mode import get_runtime_mode
 from options_algo_v2.services.scan_trade_candidate_builder import (
     build_serialized_trade_candidates,
 )
+from options_algo_v2.services.top_trade_summary_builder import (
+    build_top_trade_summary_rows,
+)
 from options_algo_v2.services.trade_candidate_diagnostics import (
     count_trade_candidates_by_strategy_family,
     count_trade_candidates_by_symbol,
@@ -101,6 +104,7 @@ def build_scan_result(
         ranked_trade_candidates,
         top_n=3,
     )
+    top_trade_summary_rows = build_top_trade_summary_rows(top_trade_candidates)
 
     runtime_metadata: dict[str, object] = {
         "runtime_mode": get_runtime_mode(),
@@ -126,6 +130,7 @@ def build_scan_result(
         "top_trade_candidate_symbols": [
             str(item.get("symbol", "unknown")) for item in top_trade_candidates
         ],
+        "top_trade_summary_rows": top_trade_summary_rows,
     }
 
     return ScanResult(
