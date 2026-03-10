@@ -44,7 +44,7 @@ def get_market_breadth_provider_name() -> str:
     runtime_mode = get_runtime_mode()
 
     if runtime_mode == "live":
-        return "live"
+        return "market_breadth_live"
 
     return "mock"
 
@@ -53,6 +53,6 @@ def get_market_breadth_provider_source() -> str:
     runtime_mode = get_runtime_mode()
 
     if runtime_mode == "live":
-        return "live_placeholder"
+        return "market_breadth_live"
 
     return "mock"

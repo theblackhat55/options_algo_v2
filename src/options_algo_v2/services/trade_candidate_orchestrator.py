@@ -23,15 +23,26 @@ def build_trade_candidates_for_decision(
 ) -> list[TradeCandidate]:
     _ = expiration
     chain = options_chain_provider.get_chain(symbol=decision.candidate.symbol)
+    as_of = date(2026, 3, 10)
 
     spread_candidates = select_spread_candidates_across_expirations(
         decision=decision,
         chain=chain,
-        as_of_date=date(2026, 3, 10),
+        as_of_date=as_of,
         min_dte=30,
         max_dte=60,
         target_dte=38,
     )
+
+    if not spread_candidates:
+        spread_candidates = select_spread_candidates_across_expirations(
+            decision=decision,
+            chain=chain,
+            as_of_date=as_of,
+            min_dte=1,
+            max_dte=14,
+            target_dte=7,
+        )
 
     return build_qualified_trade_candidates(
         spread_candidates,

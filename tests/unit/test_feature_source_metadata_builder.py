@@ -31,7 +31,7 @@ def test_build_feature_source_metadata_returns_live_metadata(
     metadata = build_feature_source_metadata(symbol="SPY")
 
     assert metadata.symbol == "SPY"
-    assert metadata.historical_row_provider == "live_placeholder"
-    assert metadata.market_breadth_provider == "live_placeholder"
+    assert metadata.historical_row_provider == "databento"
+    assert metadata.market_breadth_provider == "market_breadth_live"
     assert metadata.dataset == "GLBX.MDP3"
     assert metadata.schema == "ohlcv-1m"

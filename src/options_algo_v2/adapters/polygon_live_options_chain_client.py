@@ -31,12 +31,11 @@ class PolygonLiveOptionsChainClient:
 
         query = urlencode(
             {
-                "underlying_ticker": symbol,
                 "limit": 250,
                 "apiKey": settings.api_key,
             }
         )
-        url = f"{settings.base_url}/v3/snapshot/options?{query}"
+        url = f"{settings.base_url}/v3/snapshot/options/{symbol}?{query}"
         payload = self.fetch_json(url, settings.timeout_seconds)
         return self.normalize_chain_payload(symbol=symbol, payload=payload)
 
@@ -97,11 +96,20 @@ class PolygonLiveOptionsChainClient:
             return None
 
         last_quote = item.get("last_quote")
-        if not isinstance(last_quote, dict):
-            return None
+        bid: float | None = None
+        ask: float | None = None
 
-        bid = self._to_float(last_quote.get("bid"))
-        ask = self._to_float(last_quote.get("ask"))
+        if isinstance(last_quote, dict):
+            bid = self._to_float(last_quote.get("bid"))
+            ask = self._to_float(last_quote.get("ask"))
+
+        day = item.get("day")
+        if (bid is None or ask is None) and isinstance(day, dict):
+            close_price = self._to_float(day.get("close"))
+            if close_price is not None:
+                bid = close_price
+                ask = close_price
+
         if bid is None or ask is None:
             return None
 

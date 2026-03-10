@@ -115,11 +115,12 @@ def build_scan_result(
             for decision in decisions
         )
     ]
+    runtime_mode = get_runtime_mode()
     trade_candidates = build_serialized_trade_candidates(
         decisions=decisions,
         expiration="2026-04-17",
-        min_open_interest=900,
-        max_bid_ask_spread_width=0.5,
+        min_open_interest=0 if runtime_mode == "live" else 900,
+        max_bid_ask_spread_width=5.0 if runtime_mode == "live" else 0.5,
     )
     ranked_trade_candidates = rank_trade_candidates(trade_candidates)
     top_trade_candidates = select_top_trade_candidates(

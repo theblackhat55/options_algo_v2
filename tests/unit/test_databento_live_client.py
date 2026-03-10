@@ -65,7 +65,23 @@ def test_databento_live_client_raises_when_package_missing(
     monkeypatch.setenv("DATABENTO_DATASET", "XNAS.ITCH")
     monkeypatch.setenv("DATABENTO_SCHEMA", "ohlcv-1d")
 
-    client = DatabentoLiveClient(api_key="test-key")
+    class MissingSdkWrapper:
+        def get_underlying_snapshot(
+            self,
+            *,
+            symbol: str,
+            dataset: str,
+            schema: str,
+        ) -> dict[str, object]:
+            _ = symbol
+            _ = dataset
+            _ = schema
+            raise RuntimeError("databento package is not installed")
+
+    client = DatabentoLiveClient(
+        api_key="test-key",
+        sdk_wrapper=MissingSdkWrapper(),
+    )
 
     with pytest.raises(RuntimeError, match="databento package is not installed"):
         client.get_underlying_snapshot("AAPL")

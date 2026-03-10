@@ -48,7 +48,7 @@ def test_polygon_live_options_chain_client_normalizes_snapshot(
     client = PolygonLiveOptionsChainClient(fetch_json=fake_fetch_json)
     snapshot = client.get_chain_snapshot("AAPL")
 
-    assert "underlying_ticker=AAPL" in str(captured["url"])
+    assert "/v3/snapshot/options/AAPL?" in str(captured["url"])
     assert captured["timeout_seconds"] == 10.0
 
     assert snapshot.symbol == "AAPL"

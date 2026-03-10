@@ -60,15 +60,20 @@ def test_build_underlying_fetcher_returns_live_callable_when_key_present(
     monkeypatch.setenv("OPTIONS_ALGO_RUNTIME_MODE", "live")
     monkeypatch.setenv("DATABENTO_API_KEY", "test-key")
 
-    fetcher = build_underlying_fetcher()
+    class MissingLiveClient:
+        def __init__(self, api_key: str) -> None:
+            self.api_key = api_key
 
-    with pytest.raises(
-        (RuntimeError, NotImplementedError),
-        match=(
-            "databento package is not installed|"
-            "Databento SDK wrapper fetch is not implemented"
-        ),
-    ):
+        def get_underlying_snapshot(self, symbol: str) -> dict[str, object]:
+            _ = symbol
+            raise RuntimeError("databento package is not installed")
+
+    def builder(api_key: str) -> UnderlyingLiveClient:
+        return MissingLiveClient(api_key=api_key)
+
+    fetcher = build_underlying_fetcher(client_builder=builder)
+
+    with pytest.raises(RuntimeError, match="databento package is not installed"):
         fetcher("AAPL")
 
 

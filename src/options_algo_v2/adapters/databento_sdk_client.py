@@ -1,14 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import ModuleType
 from typing import Protocol, cast
 
 
 class _DatabentoRangeResponse(Protocol):
-    def to_list(self) -> list[dict[str, object]]:
-        ...
+    ...
 
 
 class _DatabentoTimeseriesClient(Protocol):
@@ -22,7 +22,7 @@ class _DatabentoHistoricalClient(Protocol):
 
 def _load_databento_module() -> ModuleType:
     try:
-        import databento  # type: ignore[import-not-found]
+        import databento
     except ImportError as exc:
         raise RuntimeError("databento package is not installed") from exc
 
@@ -94,13 +94,64 @@ def _build_get_range_kwargs(
     dataset: str,
     schema: str,
 ) -> dict[str, object]:
+    end = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    start = end - timedelta(days=60)
+
     return {
         "dataset": dataset,
         "schema": schema,
         "symbols": symbol,
         "stype_in": "raw_symbol",
+        "start": start,
+        "end": end,
         "limit": 100,
     }
+
+
+def _record_to_dict(record: object) -> dict[str, object]:
+    if isinstance(record, dict):
+        return dict(record)
+
+    if hasattr(record, "__dict__"):
+        data = {
+            key: value
+            for key, value in vars(record).items()
+            if not key.startswith("_")
+        }
+        if data:
+            return data
+
+    raise TypeError("unable to normalize databento record")
+
+
+def _normalize_response_rows(response: object) -> list[dict[str, object]]:
+    if hasattr(response, "to_list"):
+        to_list = response.to_list
+        if callable(to_list):
+            result = to_list()
+            if isinstance(result, list):
+                return [dict(item) for item in result if isinstance(item, dict)]
+
+    if hasattr(response, "to_df"):
+        to_df = response.to_df
+        if callable(to_df):
+            df = to_df()
+            if hasattr(df, "to_dict"):
+                records = df.to_dict("records")
+                if isinstance(records, list):
+                    return [dict(item) for item in records if isinstance(item, dict)]
+
+    if hasattr(response, "__iter__"):
+        rows: list[dict[str, object]] = []
+        for item in cast(Iterable[object], response):
+            try:
+                rows.append(_record_to_dict(item))
+            except TypeError:
+                continue
+        if rows:
+            return rows
+
+    raise TypeError("unable to extract rows from databento response")
 
 
 @dataclass(frozen=True)
@@ -109,7 +160,7 @@ class DatabentoHistoricalClientWrapper:
 
     def build_client(self) -> _DatabentoHistoricalClient:
         databento = _load_databento_module()
-        return databento.Historical(api_key=self.api_key)
+        return databento.Historical(self.api_key)
 
     def get_bar_rows(
         self,
@@ -126,7 +177,7 @@ class DatabentoHistoricalClientWrapper:
                 schema=schema,
             )
         )
-        return response.to_list()
+        return _normalize_response_rows(response)
 
     def get_underlying_snapshot(
         self,

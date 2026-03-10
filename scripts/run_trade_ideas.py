@@ -3,7 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from scripts.run_nightly_scan import run_nightly_scan
+try:
+    from run_nightly_scan import run_nightly_scan
+except ModuleNotFoundError:
+    from scripts.run_nightly_scan import run_nightly_scan
 
 
 def run_trade_ideas() -> str:

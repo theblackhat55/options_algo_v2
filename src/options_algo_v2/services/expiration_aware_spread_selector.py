@@ -91,20 +91,22 @@ def _filter_quotes_for_strategy(
         calls = [
             quote for quote in quotes if str(quote.option_type).lower() == "call"
         ]
-        return filter_quotes_by_delta_band(
+        filtered = filter_quotes_by_delta_band(
             calls,
             min_abs_delta=0.20,
             max_abs_delta=0.45,
         )
+        return filtered or calls
 
     if strategy_family == "BULL_PUT_SPREAD":
         puts = [
             quote for quote in quotes if str(quote.option_type).lower() == "put"
         ]
-        return filter_quotes_by_delta_band(
+        filtered = filter_quotes_by_delta_band(
             puts,
             min_abs_delta=0.15,
             max_abs_delta=0.35,
         )
+        return filtered or puts
 
     return []

@@ -31,7 +31,7 @@ def test_live_market_breadth_provider_placeholder_raises(
     provider = build_market_breadth_provider()
 
     with pytest.raises(
-        NotImplementedError,
-        match="live market breadth client is not implemented",
+        RuntimeError,
+        match="live market breadth data source is not configured",
     ):
         provider.get_pct_above_20dma(symbol="AAPL")
