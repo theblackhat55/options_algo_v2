@@ -16,10 +16,13 @@ def inspect_scan_result(path_str: str) -> int:
 
     summary = payload.get("summary", {})
     config_versions = payload.get("config_versions", {})
+    runtime_metadata = payload.get("runtime_metadata", {})
 
     print(f"run_id={payload.get('run_id', '')}")
     print(f"generated_at={payload.get('generated_at', '')}")
     print(f"config_versions={config_versions}")
+    print(f"runtime_mode={runtime_metadata.get('runtime_mode', '')}")
+    print(f"databento_runtime={runtime_metadata.get('databento', {})}")
     print(
         "summary="
         f"total={summary.get('total_candidates', 0)},"

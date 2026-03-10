@@ -4,7 +4,10 @@ from pathlib import Path
 from scripts.inspect_scan_result import inspect_scan_result
 
 
-def test_inspect_scan_result_returns_zero_for_valid_file(tmp_path: Path, capsys) -> None:
+def test_inspect_scan_result_returns_zero_for_valid_file(
+    tmp_path: Path,
+    capsys,
+) -> None:
     payload = {
         "run_id": "scan_test_001",
         "generated_at": "2026-03-10T17:36:54+00:00",
@@ -12,6 +15,14 @@ def test_inspect_scan_result_returns_zero_for_valid_file(tmp_path: Path, capsys)
             "universe": "universe_v1",
             "strategy": "strategy_v1",
             "risk": "risk_v1",
+        },
+        "runtime_metadata": {
+            "runtime_mode": "mock",
+            "databento": {
+                "dataset": "XNAS.ITCH",
+                "schema": "ohlcv-1d",
+                "has_api_key": "false",
+            },
         },
         "summary": {
             "total_candidates": 10,
@@ -30,7 +41,7 @@ def test_inspect_scan_result_returns_zero_for_valid_file(tmp_path: Path, capsys)
                 "BULL_PUT_SPREAD": 5,
             },
             "passed_symbols": ["AAPL", "MSFT", "NVDA"],
-            "rejected_symbols": ["META", "SPY", "QQQ", "IBM", "XOM", "JNJ", "KO"],
+            "rejected_symbols": ["SPY", "QQQ", "IWM", "XLK", "XLF", "XLE", "SMH"],
         },
         "decisions": [],
     }
@@ -43,6 +54,8 @@ def test_inspect_scan_result_returns_zero_for_valid_file(tmp_path: Path, capsys)
 
     assert exit_code == 0
     assert "run_id=scan_test_001" in captured.out
+    assert "runtime_mode=mock" in captured.out
+    assert "databento_runtime=" in captured.out
     assert "summary=total=10,passed=3,rejected=7" in captured.out
     assert "rejection_reason_counts=" in captured.out
     assert "signal_state_counts=" in captured.out
