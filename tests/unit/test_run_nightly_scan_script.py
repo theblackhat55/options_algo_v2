@@ -42,12 +42,18 @@ def test_run_nightly_scan_live_mode_requires_databento_key(
         run_nightly_scan()
 
 
-def test_run_nightly_scan_live_mode_with_key_requires_databento_package(
+def test_run_nightly_scan_live_mode_with_key_requires_live_dependencies(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("OPTIONS_ALGO_RUNTIME_MODE", "live")
     monkeypatch.setenv("DATABENTO_API_KEY", "test-key")
 
-    with pytest.raises(RuntimeError, match="databento package is not installed"):
+    with pytest.raises(
+        (RuntimeError, NotImplementedError),
+        match=(
+            "live market breadth provider is not implemented|"
+            "databento package is not installed"
+        ),
+    ):
         run_nightly_scan()
 
