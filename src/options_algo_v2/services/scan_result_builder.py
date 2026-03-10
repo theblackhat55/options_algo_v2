@@ -59,6 +59,9 @@ from options_algo_v2.services.trade_candidate_selection_diagnostics import (
     count_ranked_trade_candidates_by_strategy_family,
     list_ranked_trade_candidate_symbols,
 )
+from options_algo_v2.services.trade_idea_builder import (
+    build_trade_ideas,
+)
 
 
 def build_scan_summary(decisions: list[CandidateDecision]) -> ScanSummary:
@@ -123,6 +126,10 @@ def build_scan_result(
         trade_candidates
     )
     top_trade_summary_rows = build_top_trade_summary_rows(top_trade_candidates)
+    trade_ideas = build_trade_ideas(
+        trade_candidates=trade_candidates,
+        decisions=serialized_decisions,
+    )
 
     runtime_metadata: dict[str, object] = {
         "runtime_mode": get_runtime_mode(),
@@ -157,6 +164,10 @@ def build_scan_result(
                 for item in trade_candidates
             }
         ),
+        "selected_trade_candidate_symbols": [
+            str(item.get("symbol", "unknown")) for item in trade_candidates
+        ],
+        "selected_trade_candidate_count": len(trade_candidates),
         "ranked_trade_candidate_counts_by_strategy_family": (
             count_ranked_trade_candidates_by_strategy_family(
                 ranked_selected_trade_candidates
@@ -179,5 +190,6 @@ def build_scan_result(
         runtime_metadata=runtime_metadata,
         feature_sources=feature_sources,
         trade_candidates=ranked_trade_candidates,
+        trade_ideas=trade_ideas,
         decisions=serialized_decisions,
     )

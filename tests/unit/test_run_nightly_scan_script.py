@@ -22,6 +22,7 @@ def test_run_nightly_scan_returns_json_path(
     assert "summary" in payload
     assert "runtime_metadata" in payload
     assert "feature_sources" in payload
+    assert "trade_ideas" in payload
     assert payload["runtime_metadata"]["runtime_mode"] == "mock"
     assert payload["runtime_metadata"]["databento"] == {
         "dataset": "XNAS.ITCH",
@@ -66,6 +67,8 @@ def test_run_nightly_scan_returns_json_path(
     assert payload["runtime_metadata"]["top_trade_summary_rows"][0]["symbol"] == "AAPL"
     assert "trade_candidates" in payload
     assert len(payload["trade_candidates"]) == 3
+    assert len(payload["trade_ideas"]) == 3
+    assert payload["trade_ideas"][0]["strategy_family"] == "BULL_PUT_SPREAD"
     assert len(payload["feature_sources"]) == 10
     assert payload["feature_sources"][0]["historical_row_provider"] == "mock"
     assert payload["feature_sources"][0]["market_breadth_provider"] == "mock"

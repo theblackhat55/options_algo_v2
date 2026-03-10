@@ -81,6 +81,14 @@ def inspect_scan_result(path_str: str) -> int:
         f"{runtime_metadata.get('selected_trade_candidate_expirations', [])}"
     )
     print(
+        "selected_trade_candidate_symbols="
+        f"{runtime_metadata.get('selected_trade_candidate_symbols', [])}"
+    )
+    print(
+        "selected_trade_candidate_count="
+        f"{runtime_metadata.get('selected_trade_candidate_count', 0)}"
+    )
+    print(
         "top_trade_candidate_symbols="
         f"{runtime_metadata.get('top_trade_candidate_symbols', [])}"
     )
@@ -94,6 +102,9 @@ def inspect_scan_result(path_str: str) -> int:
 
     trade_candidates = payload.get("trade_candidates", [])
     print(f"trade_candidates={trade_candidates}")
+
+    trade_ideas = payload.get("trade_ideas", [])
+    print(f"trade_ideas={trade_ideas}")
 
     summary = payload.get("summary", {})
     print(
