@@ -1,0 +1,23 @@
+version: universe_v1
+description: Fixed MVP universe for Phase 1 research and candidate generation
+
+symbols:
+  - SPY
+  - QQQ
+  - IWM
+  - XLK
+  - XLF
+  - XLE
+  - SMH
+  - AAPL
+  - MSFT
+  - NVDA
+  - AMZN
+  - META
+  - GOOGL
+  - AMD
+  - TSLA
+  - JPM
+  - BAC
+  - XOM
+  - CVX

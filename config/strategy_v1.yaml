@@ -1,0 +1,55 @@
+version: strategy_v1
+description: MVP strategy thresholds for options_algo_v2
+
+time_conventions:
+  dte_unit: calendar_days
+  holding_cap_unit: calendar_days
+  hv_lookback_unit: trading_days
+  iv_rank_lookback_unit: trading_days
+  earnings_buffer_unit: trading_days
+
+regime:
+  breadth_bullish_threshold: 55.0
+  breadth_bearish_threshold: 45.0
+
+directional:
+  adx_trending_min: 18.0
+  adx_breakout_min: 16.0
+  rsi_bullish_min: 50.0
+  rsi_bullish_max: 70.0
+  rsi_bearish_min: 30.0
+  rsi_bearish_max: 50.0
+  breakout_volume_multiple: 1.5
+  extension_atr_multiple: 1.5
+
+iv:
+  iv_rank_lookback_days: 252
+  hv_lookback_days: 20
+  iv_rich_rank_min: 60.0
+  iv_cheap_rank_max: 30.0
+  iv_hv_rich_min: 1.25
+  iv_hv_cheap_max: 1.05
+  iv_rv_spread_rich_min: 5.0
+  iv_rank_fallback_value: 50.0
+
+dte:
+  credit_min: 25
+  credit_max: 45
+  credit_target: 35
+  debit_min: 14
+  debit_max: 45
+  debit_target: 28
+
+delta_targets:
+  credit_short_target: 0.22
+  credit_short_min: 0.15
+  credit_short_max: 0.30
+  debit_long_target: 0.55
+  debit_long_min: 0.45
+  debit_long_max: 0.65
+  delta_tolerance: 0.03
+
+forecast:
+  continuation_atr_multiple: 1.0
+  breakout_atr_multiple: 1.25
+  breakout_range_fraction: 0.5
