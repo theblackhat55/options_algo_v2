@@ -1,0 +1,63 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from options_algo_v2.domain.options_chain import OptionQuote, OptionsChainSnapshot
+
+
+@dataclass(frozen=True)
+class VerticalSpreadCandidate:
+    symbol: str
+    strategy_family: str
+    short_leg: OptionQuote
+    long_leg: OptionQuote
+
+
+def select_vertical_call_spread_candidates(
+    *,
+    chain: OptionsChainSnapshot,
+    expiration: str,
+) -> list[VerticalSpreadCandidate]:
+    calls = [
+        quote
+        for quote in chain.quotes
+        if quote.option_type == "call" and quote.expiration == expiration
+    ]
+    calls = sorted(calls, key=lambda quote: quote.strike)
+
+    candidates: list[VerticalSpreadCandidate] = []
+    for left, right in zip(calls, calls[1:], strict=False):
+        candidates.append(
+            VerticalSpreadCandidate(
+                symbol=chain.symbol,
+                strategy_family="BULL_CALL_SPREAD",
+                short_leg=left,
+                long_leg=right,
+            )
+        )
+    return candidates
+
+
+def select_vertical_put_spread_candidates(
+    *,
+    chain: OptionsChainSnapshot,
+    expiration: str,
+) -> list[VerticalSpreadCandidate]:
+    puts = [
+        quote
+        for quote in chain.quotes
+        if quote.option_type == "put" and quote.expiration == expiration
+    ]
+    puts = sorted(puts, key=lambda quote: quote.strike, reverse=True)
+
+    candidates: list[VerticalSpreadCandidate] = []
+    for left, right in zip(puts, puts[1:], strict=False):
+        candidates.append(
+            VerticalSpreadCandidate(
+                symbol=chain.symbol,
+                strategy_family="BULL_PUT_SPREAD",
+                short_leg=left,
+                long_leg=right,
+            )
+        )
+    return candidates
