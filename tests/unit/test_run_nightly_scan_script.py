@@ -29,6 +29,7 @@ def test_run_nightly_scan_returns_json_path(
         "has_api_key": "false",
     }
     assert payload["runtime_metadata"]["historical_row_provider"] == "mock"
+    assert payload["runtime_metadata"]["historical_row_provider_source"] == "mock"
     assert payload["runtime_metadata"]["market_breadth_provider"] == "mock"
     assert payload["runtime_metadata"]["market_breadth_provider_source"] == "mock"
     assert payload["runtime_metadata"][
@@ -48,6 +49,14 @@ def test_run_nightly_scan_returns_json_path(
         "MSFT": 1,
         "NVDA": 1,
     }
+    assert payload["runtime_metadata"]["ranked_trade_candidate_counts_by_strategy_family"] == {
+        "BULL_PUT_SPREAD": 3
+    }
+    assert payload["runtime_metadata"]["ranked_trade_candidate_symbols"] == [
+        "AAPL",
+        "MSFT",
+        "NVDA",
+    ]
     assert payload["runtime_metadata"]["top_trade_candidate_symbols"] == [
         "AAPL",
         "MSFT",
@@ -86,7 +95,7 @@ def test_run_nightly_scan_live_mode_with_key_requires_live_dependencies(
     with pytest.raises(
         (RuntimeError, NotImplementedError),
         match=(
-            "live market breadth client is not implemented|"
+            "live market breadth data source is not configured|"
             "databento package is not installed"
         ),
     ):
