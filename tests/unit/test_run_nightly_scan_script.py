@@ -43,6 +43,6 @@ def test_run_nightly_scan_live_mode_not_implemented_with_key(
 
     with pytest.raises(
         NotImplementedError,
-        match="Databento live client is not implemented",
+        match="Databento SDK wrapper is not implemented",
     ):
         run_nightly_scan()
