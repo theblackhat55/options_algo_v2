@@ -37,6 +37,9 @@ from options_algo_v2.services.runtime_mode import get_runtime_mode
 from options_algo_v2.services.scan_trade_candidate_builder import (
     build_serialized_trade_candidates,
 )
+from options_algo_v2.services.serialized_trade_candidate_selector import (
+    rank_serialized_trade_candidates,
+)
 from options_algo_v2.services.top_trade_summary_builder import (
     build_top_trade_summary_rows,
 )
@@ -47,6 +50,10 @@ from options_algo_v2.services.trade_candidate_diagnostics import (
 from options_algo_v2.services.trade_candidate_ranking import (
     rank_trade_candidates,
     select_top_trade_candidates,
+)
+from options_algo_v2.services.trade_candidate_selection_diagnostics import (
+    count_ranked_trade_candidates_by_strategy_family,
+    list_ranked_trade_candidate_symbols,
 )
 
 
@@ -108,6 +115,9 @@ def build_scan_result(
         ranked_trade_candidates,
         top_n=3,
     )
+    ranked_selected_trade_candidates = rank_serialized_trade_candidates(
+        trade_candidates
+    )
     top_trade_summary_rows = build_top_trade_summary_rows(top_trade_candidates)
 
     runtime_metadata: dict[str, object] = {
@@ -132,6 +142,14 @@ def build_scan_result(
         ),
         "trade_candidate_counts_by_symbol": (
             count_trade_candidates_by_symbol(trade_candidates)
+        ),
+        "ranked_trade_candidate_counts_by_strategy_family": (
+            count_ranked_trade_candidates_by_strategy_family(
+                ranked_selected_trade_candidates
+            )
+        ),
+        "ranked_trade_candidate_symbols": list_ranked_trade_candidate_symbols(
+            ranked_selected_trade_candidates
         ),
         "top_trade_candidate_symbols": [
             str(item.get("symbol", "unknown")) for item in top_trade_candidates
