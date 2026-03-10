@@ -1,11 +1,12 @@
 from datetime import date
 
 from options_algo_v2.domain.enums import DirectionalState, IVState, MarketRegime
+from options_algo_v2.domain.evaluation_input import CandidateEvaluationInput
 from options_algo_v2.services.decision_engine import evaluate_candidate_decision
 
 
 def test_decision_passes_when_score_meets_threshold() -> None:
-    decision = evaluate_candidate_decision(
+    evaluation_input = CandidateEvaluationInput(
         symbol="AAPL",
         market_regime=MarketRegime.TREND_UP,
         directional_state=DirectionalState.BULLISH_CONTINUATION,
@@ -26,13 +27,14 @@ def test_decision_passes_when_score_meets_threshold() -> None:
         expected_move_fit=True,
     )
 
+    decision = evaluate_candidate_decision(evaluation_input)
+
     assert decision.final_passed is True
     assert decision.final_score >= decision.min_score_required
 
 
-def test_decision_still_passes_when_expected_move_fit_is_false(
-) -> None:
-    decision = evaluate_candidate_decision(
+def test_decision_still_passes_when_expected_move_fit_is_false() -> None:
+    evaluation_input = CandidateEvaluationInput(
         symbol="MSFT",
         market_regime=MarketRegime.TREND_UP,
         directional_state=DirectionalState.BULLISH_CONTINUATION,
@@ -52,6 +54,8 @@ def test_decision_still_passes_when_expected_move_fit_is_false(
         atr20=2.0,
         expected_move_fit=False,
     )
+
+    decision = evaluate_candidate_decision(evaluation_input)
 
     assert decision.final_score == 85.0
     assert decision.min_score_required == 70.0

@@ -7,11 +7,12 @@ from options_algo_v2.domain.enums import (
     SignalState,
     StrategyType,
 )
+from options_algo_v2.domain.evaluation_input import CandidateEvaluationInput
 from options_algo_v2.services.decision_engine import evaluate_candidate_decision
 
 
 def test_decision_engine_returns_passed_candidate() -> None:
-    decision = evaluate_candidate_decision(
+    evaluation_input = CandidateEvaluationInput(
         symbol="AAPL",
         market_regime=MarketRegime.TREND_UP,
         directional_state=DirectionalState.BULLISH_CONTINUATION,
@@ -32,15 +33,18 @@ def test_decision_engine_returns_passed_candidate() -> None:
         expected_move_fit=True,
     )
 
+    decision = evaluate_candidate_decision(evaluation_input)
+
     assert decision.candidate.signal_state == SignalState.QUALIFIED
     assert decision.candidate.strategy_type == StrategyType.BULL_PUT_SPREAD
     assert decision.final_passed is True
     assert decision.final_score == 100.0
+    assert decision.min_score_required == 70.0
     assert decision.rejection_reasons == []
 
 
 def test_decision_engine_rejects_for_earnings_event() -> None:
-    decision = evaluate_candidate_decision(
+    evaluation_input = CandidateEvaluationInput(
         symbol="MSFT",
         market_regime=MarketRegime.TREND_UP,
         directional_state=DirectionalState.BULLISH_CONTINUATION,
@@ -61,12 +65,14 @@ def test_decision_engine_rejects_for_earnings_event() -> None:
         expected_move_fit=True,
     )
 
+    decision = evaluate_candidate_decision(evaluation_input)
+
     assert decision.final_passed is False
     assert "earnings event occurs before planned exit" in decision.rejection_reasons
 
 
 def test_decision_engine_rejects_for_liquidity_failure() -> None:
-    decision = evaluate_candidate_decision(
+    evaluation_input = CandidateEvaluationInput(
         symbol="TSLA",
         market_regime=MarketRegime.TREND_DOWN,
         directional_state=DirectionalState.BEARISH_CONTINUATION,
@@ -87,12 +93,14 @@ def test_decision_engine_rejects_for_liquidity_failure() -> None:
         expected_move_fit=True,
     )
 
+    decision = evaluate_candidate_decision(evaluation_input)
+
     assert decision.final_passed is False
     assert len(decision.rejection_reasons) > 0
 
 
 def test_decision_engine_rejects_for_extension_failure() -> None:
-    decision = evaluate_candidate_decision(
+    evaluation_input = CandidateEvaluationInput(
         symbol="NVDA",
         market_regime=MarketRegime.TREND_UP,
         directional_state=DirectionalState.BULLISH_BREAKOUT,
@@ -113,12 +121,14 @@ def test_decision_engine_rejects_for_extension_failure() -> None:
         expected_move_fit=True,
     )
 
+    decision = evaluate_candidate_decision(evaluation_input)
+
     assert decision.final_passed is False
     assert "bullish setup is too extended above 20 dma" in decision.rejection_reasons
 
 
 def test_decision_engine_returns_zero_score_for_selector_rejection() -> None:
-    decision = evaluate_candidate_decision(
+    evaluation_input = CandidateEvaluationInput(
         symbol="SPY",
         market_regime=MarketRegime.RANGE_UNCLEAR,
         directional_state=DirectionalState.BULLISH_CONTINUATION,
@@ -138,6 +148,8 @@ def test_decision_engine_returns_zero_score_for_selector_rejection() -> None:
         atr20=2.0,
         expected_move_fit=True,
     )
+
+    decision = evaluate_candidate_decision(evaluation_input)
 
     assert decision.candidate.signal_state == SignalState.REJECTED
     assert decision.final_passed is False
