@@ -97,16 +97,16 @@ def _build_raw_feature_with_fallback(
     return raw, "mock_historical_fallback"
 
 
-def run_nightly_scan() -> str:
+def run_nightly_scan(symbols: list[str] | None = None) -> str:
     runtime_mode = get_runtime_mode()
-    symbols = load_universe_symbols()
+    selected_symbols = symbols if symbols is not None else load_universe_symbols()
     row_provider = build_historical_row_provider()
     breadth_provider = build_market_breadth_provider()
 
     raw_features = []
     historical_provider_modes: dict[str, str] = {}
 
-    for symbol in symbols[:10]:
+    for symbol in selected_symbols[:10]:
         raw, provider_mode = _build_raw_feature_with_fallback(
             symbol=symbol,
             row_provider=row_provider,
@@ -125,6 +125,7 @@ def run_nightly_scan() -> str:
     runtime_metadata = payload["runtime_metadata"]
 
     print(f"runtime_mode={runtime_mode}")
+    print(f"symbols={selected_symbols[:10]}")
     print(f"run_id={payload['run_id']}")
     print(f"output_path={output_path}")
     print(

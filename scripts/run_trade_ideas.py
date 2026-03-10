@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 try:
@@ -9,8 +10,8 @@ except ModuleNotFoundError:
     from scripts.run_nightly_scan import run_nightly_scan
 
 
-def run_trade_ideas() -> str:
-    output_path = run_nightly_scan()
+def run_trade_ideas(symbols: list[str] | None = None) -> str:
+    output_path = run_nightly_scan(symbols=symbols)
     path = Path(output_path)
     payload = json.loads(path.read_text())
 
@@ -58,4 +59,4 @@ def run_trade_ideas() -> str:
 
 
 if __name__ == "__main__":
-    run_trade_ideas()
+    run_trade_ideas(symbols=sys.argv[1:] or None)
