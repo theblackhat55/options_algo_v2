@@ -1,0 +1,118 @@
+from __future__ import annotations
+
+from options_algo_v2.domain.candidates import StrategyCandidate
+from options_algo_v2.domain.enums import (
+    DirectionalState,
+    IVState,
+    MarketRegime,
+    SignalState,
+    StrategyType,
+)
+from options_algo_v2.services.rulebook_policy import regime_allows_strategy
+
+
+def _reject_candidate(
+    *,
+    symbol: str,
+    market_regime: MarketRegime,
+    directional_state: DirectionalState,
+    iv_state: IVState,
+    reason: str,
+) -> StrategyCandidate:
+    return StrategyCandidate(
+        symbol=symbol,
+        market_regime=market_regime,
+        directional_state=directional_state,
+        iv_state=iv_state,
+        strategy_type=StrategyType.BULL_CALL_SPREAD,
+        signal_state=SignalState.REJECTED,
+        score=0.0,
+        rationale=[reason],
+    )
+
+
+def select_strategy_candidate(
+    *,
+    symbol: str,
+    market_regime: MarketRegime,
+    directional_state: DirectionalState,
+    iv_state: IVState,
+) -> StrategyCandidate:
+    if market_regime in {
+        MarketRegime.RANGE_UNCLEAR,
+        MarketRegime.RISK_OFF,
+        MarketRegime.SYSTEM_DEGRADED,
+    }:
+        return _reject_candidate(
+            symbol=symbol,
+            market_regime=market_regime,
+            directional_state=directional_state,
+            iv_state=iv_state,
+            reason="market regime does not permit new entries",
+        )
+
+    if directional_state in {
+        DirectionalState.NEUTRAL,
+        DirectionalState.NO_TRADE,
+    }:
+        return _reject_candidate(
+            symbol=symbol,
+            market_regime=market_regime,
+            directional_state=directional_state,
+            iv_state=iv_state,
+            reason="directional state is not actionable",
+        )
+
+    strategy_type: StrategyType
+
+    if directional_state in {
+        DirectionalState.BULLISH_CONTINUATION,
+        DirectionalState.BULLISH_BREAKOUT,
+    }:
+        if iv_state == IVState.IV_RICH:
+            strategy_type = StrategyType.BULL_PUT_SPREAD
+        else:
+            strategy_type = StrategyType.BULL_CALL_SPREAD
+    elif directional_state in {
+        DirectionalState.BEARISH_CONTINUATION,
+        DirectionalState.BEARISH_BREAKDOWN,
+    }:
+        if iv_state == IVState.IV_RICH:
+            strategy_type = StrategyType.BEAR_CALL_SPREAD
+        else:
+            strategy_type = StrategyType.BEAR_PUT_SPREAD
+    else:
+        return _reject_candidate(
+            symbol=symbol,
+            market_regime=market_regime,
+            directional_state=directional_state,
+            iv_state=iv_state,
+            reason="unhandled directional state",
+        )
+
+    if not regime_allows_strategy(market_regime, strategy_type):
+        return _reject_candidate(
+            symbol=symbol,
+            market_regime=market_regime,
+            directional_state=directional_state,
+            iv_state=iv_state,
+            reason="strategy not permitted in current regime",
+        )
+
+    rationale = [
+        f"market_regime={market_regime.value}",
+        f"directional_state={directional_state.value}",
+        f"iv_state={iv_state.value}",
+        f"selected_strategy={strategy_type.value}",
+    ]
+
+    return StrategyCandidate(
+        symbol=symbol,
+        market_regime=market_regime,
+        directional_state=directional_state,
+        iv_state=iv_state,
+        strategy_type=strategy_type,
+        signal_state=SignalState.QUALIFIED,
+        score=0.0,
+        rationale=rationale,
+    )
