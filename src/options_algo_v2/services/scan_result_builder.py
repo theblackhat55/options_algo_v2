@@ -5,6 +5,11 @@ from datetime import UTC, datetime
 from options_algo_v2.config.rulebook_config import load_rulebook_configs
 from options_algo_v2.domain.decision import CandidateDecision
 from options_algo_v2.domain.scan_result import ScanResult, ScanSummary
+from options_algo_v2.services.decision_diagnostics import (
+    count_rejection_reasons,
+    count_signal_states,
+    count_strategy_types,
+)
 from options_algo_v2.services.decision_serializer import serialize_candidate_decision
 
 
@@ -18,6 +23,9 @@ def build_scan_summary(decisions: list[CandidateDecision]) -> ScanSummary:
         total_rejected=len(rejected_symbols),
         passed_symbols=passed_symbols,
         rejected_symbols=rejected_symbols,
+        rejection_reason_counts=count_rejection_reasons(decisions),
+        signal_state_counts=count_signal_states(decisions),
+        strategy_type_counts=count_strategy_types(decisions),
     )
 
 

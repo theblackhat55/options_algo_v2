@@ -66,6 +66,14 @@ def test_build_scan_summary_counts_passed_and_rejected() -> None:
     assert summary.total_rejected == 1
     assert summary.passed_symbols == ["AAPL"]
     assert summary.rejected_symbols == ["SPY"]
+    assert summary.rejection_reason_counts == {
+        "market regime does not permit new entries": 1,
+    }
+    assert summary.signal_state_counts == {"QUALIFIED": 1, "REJECTED": 1}
+    assert summary.strategy_type_counts == {
+        "BULL_CALL_SPREAD": 1,
+        "BULL_PUT_SPREAD": 1,
+    }
 
 
 def test_build_scan_result_returns_expected_structure() -> None:
@@ -80,6 +88,14 @@ def test_build_scan_result_returns_expected_structure() -> None:
     assert result.config_versions["strategy"] == "strategy_v1"
     assert result.config_versions["risk"] == "risk_v1"
     assert result.summary.total_candidates == 2
+    assert result.summary.rejection_reason_counts == {
+        "market regime does not permit new entries": 1,
+    }
+    assert result.summary.signal_state_counts == {"QUALIFIED": 1, "REJECTED": 1}
+    assert result.summary.strategy_type_counts == {
+        "BULL_CALL_SPREAD": 1,
+        "BULL_PUT_SPREAD": 1,
+    }
     assert len(result.decisions) == 2
     assert result.decisions[0]["symbol"] == "AAPL"
     assert result.decisions[1]["symbol"] == "SPY"

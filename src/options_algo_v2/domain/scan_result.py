@@ -10,6 +10,9 @@ class ScanSummary:
     total_rejected: int
     passed_symbols: list[str] = field(default_factory=list)
     rejected_symbols: list[str] = field(default_factory=list)
+    rejection_reason_counts: dict[str, int] = field(default_factory=dict)
+    signal_state_counts: dict[str, int] = field(default_factory=dict)
+    strategy_type_counts: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

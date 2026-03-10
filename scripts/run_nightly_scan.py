@@ -54,6 +54,18 @@ def run_nightly_scan() -> str:
         f"passed={result.scan_result.summary.total_passed},"
         f"rejected={result.scan_result.summary.total_rejected}"
     )
+    print(
+        "rejection_reason_counts="
+        f"{result.scan_result.summary.rejection_reason_counts}"
+    )
+    print(
+        "signal_state_counts="
+        f"{result.scan_result.summary.signal_state_counts}"
+    )
+    print(
+        "strategy_type_counts="
+        f"{result.scan_result.summary.strategy_type_counts}"
+    )
 
     return str(result.output_path)
 
