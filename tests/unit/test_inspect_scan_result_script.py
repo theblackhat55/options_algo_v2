@@ -29,8 +29,8 @@ def test_inspect_scan_result_returns_zero_for_valid_file(
             "feature_source_counts_by_historical_row_provider": {"mock": 2},
             "feature_source_counts_by_market_breadth_provider": {"mock": 2},
             "feature_source_counts_by_dataset_schema": {"XNAS.ITCH|ohlcv-1d": 2},
-            "trade_candidate_counts_by_strategy_family": {},
-            "trade_candidate_counts_by_symbol": {},
+            "trade_candidate_counts_by_strategy_family": {"BULL_PUT_SPREAD": 1},
+            "trade_candidate_counts_by_symbol": {"AAPL": 1},
         },
         "feature_sources": [
             {
@@ -48,7 +48,38 @@ def test_inspect_scan_result_returns_zero_for_valid_file(
                 "schema": "ohlcv-1d",
             },
         ],
-        "trade_candidates": [],
+        "trade_candidates": [
+            {
+                "symbol": "AAPL",
+                "strategy_family": "BULL_PUT_SPREAD",
+                "expiration": "2026-04-17",
+                "short_leg": {
+                    "option_symbol": "AAPL_P135",
+                    "strike": 135.0,
+                    "option_type": "put",
+                    "bid": 2.3,
+                    "ask": 2.7,
+                    "mid": 2.5,
+                    "delta": -0.28,
+                    "open_interest": 1400,
+                    "volume": 320,
+                },
+                "long_leg": {
+                    "option_symbol": "AAPL_P130",
+                    "strike": 130.0,
+                    "option_type": "put",
+                    "bid": 1.3,
+                    "ask": 1.7,
+                    "mid": 1.5,
+                    "delta": -0.19,
+                    "open_interest": 1000,
+                    "volume": 260,
+                },
+                "net_debit": 0.0,
+                "net_credit": 1.0,
+                "width": 5.0,
+            }
+        ],
         "summary": {
             "total_candidates": 10,
             "total_passed": 3,
@@ -95,10 +126,12 @@ def test_inspect_scan_result_returns_zero_for_valid_file(
     assert (
         "feature_source_counts_by_dataset_schema={'XNAS.ITCH|ohlcv-1d': 2}"
     ) in captured.out
-    assert "trade_candidate_counts_by_strategy_family={}" in captured.out
-    assert "trade_candidate_counts_by_symbol={}" in captured.out
+    assert (
+        "trade_candidate_counts_by_strategy_family={'BULL_PUT_SPREAD': 1}"
+    ) in captured.out
+    assert "trade_candidate_counts_by_symbol={'AAPL': 1}" in captured.out
     assert "feature_sources=[{'symbol': 'AAPL'" in captured.out
-    assert "trade_candidates=[]" in captured.out
+    assert "trade_candidates=[{'symbol': 'AAPL'" in captured.out
     assert "summary=total=10,passed=3,rejected=7" in captured.out
 
 

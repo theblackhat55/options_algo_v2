@@ -30,6 +30,9 @@ from options_algo_v2.services.market_breadth_provider_factory import (
     get_market_breadth_provider_source,
 )
 from options_algo_v2.services.runtime_mode import get_runtime_mode
+from options_algo_v2.services.scan_trade_candidate_builder import (
+    build_serialized_trade_candidates,
+)
 from options_algo_v2.services.trade_candidate_diagnostics import (
     count_trade_candidates_by_strategy_family,
     count_trade_candidates_by_symbol,
@@ -83,7 +86,12 @@ def build_scan_result(
             for decision in decisions
         )
     ]
-    trade_candidates: list[dict[str, object]] = []
+    trade_candidates = build_serialized_trade_candidates(
+        decisions=decisions,
+        expiration="2026-04-17",
+        min_open_interest=900,
+        max_bid_ask_spread_width=0.5,
+    )
 
     runtime_metadata: dict[str, object] = {
         "runtime_mode": get_runtime_mode(),
