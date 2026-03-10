@@ -24,6 +24,10 @@ def inspect_scan_result(path_str: str) -> int:
         f"{runtime_metadata.get('historical_row_provider', 'unknown')}"
     )
     print(
+        "historical_row_provider_source="
+        f"{runtime_metadata.get('historical_row_provider_source', 'unknown')}"
+    )
+    print(
         "market_breadth_provider="
         f"{runtime_metadata.get('market_breadth_provider', 'unknown')}"
     )
@@ -59,6 +63,22 @@ def inspect_scan_result(path_str: str) -> int:
     print(
         "trade_candidate_counts_by_symbol="
         f"{runtime_metadata.get('trade_candidate_counts_by_symbol', {})}"
+    )
+    print(
+        "ranked_trade_candidate_counts_by_strategy_family="
+        f"{runtime_metadata.get('ranked_trade_candidate_counts_by_strategy_family', {})}"
+    )
+    print(
+        "ranked_trade_candidate_symbols="
+        f"{runtime_metadata.get('ranked_trade_candidate_symbols', [])}"
+    )
+    print(
+        "trade_candidate_counts_by_expiration="
+        f"{runtime_metadata.get('trade_candidate_counts_by_expiration', {})}"
+    )
+    print(
+        "selected_trade_candidate_expirations="
+        f"{runtime_metadata.get('selected_trade_candidate_expirations', [])}"
     )
     print(
         "top_trade_candidate_symbols="

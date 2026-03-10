@@ -19,6 +19,7 @@ def test_inspect_scan_result_returns_zero_for_valid_file(
         "runtime_metadata": {
             "runtime_mode": "mock",
             "historical_row_provider": "mock",
+            "historical_row_provider_source": "mock",
             "market_breadth_provider": "mock",
             "market_breadth_provider_source": "mock",
             "databento": {
@@ -31,6 +32,8 @@ def test_inspect_scan_result_returns_zero_for_valid_file(
             "feature_source_counts_by_dataset_schema": {"XNAS.ITCH|ohlcv-1d": 2},
             "trade_candidate_counts_by_strategy_family": {"BULL_PUT_SPREAD": 1},
             "trade_candidate_counts_by_symbol": {"AAPL": 1},
+            "ranked_trade_candidate_counts_by_strategy_family": {"BULL_PUT_SPREAD": 1},
+            "ranked_trade_candidate_symbols": ["AAPL"],
             "top_trade_candidate_symbols": ["AAPL"],
             "top_trade_summary_rows": [
                 {
@@ -122,6 +125,7 @@ def test_inspect_scan_result_returns_zero_for_valid_file(
     assert "run_id=scan_test_001" in captured.out
     assert "runtime_mode=mock" in captured.out
     assert "historical_row_provider=mock" in captured.out
+    assert "historical_row_provider_source=mock" in captured.out
     assert "market_breadth_provider=mock" in captured.out
     assert "market_breadth_provider_source=mock" in captured.out
     assert (
@@ -141,6 +145,8 @@ def test_inspect_scan_result_returns_zero_for_valid_file(
         "trade_candidate_counts_by_strategy_family={'BULL_PUT_SPREAD': 1}"
     ) in captured.out
     assert "trade_candidate_counts_by_symbol={'AAPL': 1}" in captured.out
+    assert "ranked_trade_candidate_counts_by_strategy_family={'BULL_PUT_SPREAD': 1}" in captured.out
+    assert "ranked_trade_candidate_symbols=['AAPL']" in captured.out
     assert "top_trade_candidate_symbols=['AAPL']" in captured.out
     assert "top_trade_summary_rows=[{'symbol': 'AAPL'" in captured.out
     assert "feature_sources=[{'symbol': 'AAPL'" in captured.out

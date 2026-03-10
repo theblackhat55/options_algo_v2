@@ -94,6 +94,7 @@ def test_build_scan_result_returns_expected_structure() -> None:
         "has_api_key": "false",
     }
     assert result.runtime_metadata["historical_row_provider"] == "mock"
+    assert result.runtime_metadata["historical_row_provider_source"] == "mock"
     assert result.runtime_metadata["market_breadth_provider"] == "mock"
     assert result.runtime_metadata["market_breadth_provider_source"] == "mock"
     assert result.runtime_metadata[
@@ -109,6 +110,10 @@ def test_build_scan_result_returns_expected_structure() -> None:
         "BULL_PUT_SPREAD": 1
     }
     assert result.runtime_metadata["trade_candidate_counts_by_symbol"] == {"AAPL": 1}
+    assert result.runtime_metadata["ranked_trade_candidate_counts_by_strategy_family"] == {
+        "BULL_PUT_SPREAD": 1
+    }
+    assert result.runtime_metadata["ranked_trade_candidate_symbols"] == ["AAPL"]
     assert result.runtime_metadata["top_trade_candidate_symbols"] == ["AAPL"]
     assert len(result.runtime_metadata["top_trade_summary_rows"]) == 1
     assert result.runtime_metadata["top_trade_summary_rows"][0]["symbol"] == "AAPL"

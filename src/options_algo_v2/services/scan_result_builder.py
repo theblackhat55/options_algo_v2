@@ -5,6 +5,9 @@ from datetime import UTC, datetime
 from options_algo_v2.config.rulebook_config import load_rulebook_configs
 from options_algo_v2.domain.decision import CandidateDecision
 from options_algo_v2.domain.scan_result import ScanResult, ScanSummary
+from options_algo_v2.services.contract_selection_diagnostics import (
+    count_trade_candidates_by_expiration,
+)
 from options_algo_v2.services.databento_runtime_info import (
     build_databento_runtime_info,
 )
@@ -24,6 +27,7 @@ from options_algo_v2.services.feature_source_metadata_builder import (
 )
 from options_algo_v2.services.historical_row_provider_factory import (
     get_historical_row_provider_name,
+    get_historical_row_provider_source,
 )
 from options_algo_v2.services.market_breadth_provider_factory import (
     get_market_breadth_provider_name,
@@ -124,6 +128,7 @@ def build_scan_result(
         "runtime_mode": get_runtime_mode(),
         "databento": build_databento_runtime_info(),
         "historical_row_provider": get_historical_row_provider_name(),
+        "historical_row_provider_source": get_historical_row_provider_source(),
         "market_breadth_provider": get_market_breadth_provider_name(),
         "market_breadth_provider_source": get_market_breadth_provider_source(),
         "options_chain_provider": get_options_chain_provider_name(),
@@ -142,6 +147,15 @@ def build_scan_result(
         ),
         "trade_candidate_counts_by_symbol": (
             count_trade_candidates_by_symbol(trade_candidates)
+        ),
+        "trade_candidate_counts_by_expiration": (
+            count_trade_candidates_by_expiration(trade_candidates)
+        ),
+        "selected_trade_candidate_expirations": sorted(
+            {
+                str(item.get("expiration", "unknown"))
+                for item in trade_candidates
+            }
         ),
         "ranked_trade_candidate_counts_by_strategy_family": (
             count_ranked_trade_candidates_by_strategy_family(
