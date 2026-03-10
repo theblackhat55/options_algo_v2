@@ -58,7 +58,7 @@ def test_databento_live_client_delegates_to_sdk_wrapper(
     ]
 
 
-def test_databento_live_client_raises_when_sdk_wrapper_not_implemented(
+def test_databento_live_client_raises_when_package_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("DATABENTO_API_KEY", "test-key")
@@ -67,11 +67,5 @@ def test_databento_live_client_raises_when_sdk_wrapper_not_implemented(
 
     client = DatabentoLiveClient(api_key="test-key")
 
-    with pytest.raises(
-        (RuntimeError, NotImplementedError),
-        match=(
-            "databento package is not installed|"
-            "Databento SDK wrapper fetch is not implemented"
-        ),
-    ):
+    with pytest.raises(RuntimeError, match="databento package is not installed"):
         client.get_underlying_snapshot("AAPL")
