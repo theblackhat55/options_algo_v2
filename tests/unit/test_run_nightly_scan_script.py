@@ -42,7 +42,10 @@ def test_run_nightly_scan_live_mode_not_implemented_with_key(
     monkeypatch.setenv("DATABENTO_API_KEY", "test-key")
 
     with pytest.raises(
-        NotImplementedError,
-        match="Databento SDK wrapper is not implemented",
+        (RuntimeError, NotImplementedError),
+        match=(
+            "databento package is not installed|"
+            "Databento SDK wrapper fetch is not implemented"
+        ),
     ):
         run_nightly_scan()

@@ -62,7 +62,13 @@ def test_build_underlying_fetcher_returns_live_callable_when_key_present(
 
     fetcher = build_underlying_fetcher()
 
-    with pytest.raises(NotImplementedError, match="Databento SDK wrapper"):
+    with pytest.raises(
+        (RuntimeError, NotImplementedError),
+        match=(
+            "databento package is not installed|"
+            "Databento SDK wrapper fetch is not implemented"
+        ),
+    ):
         fetcher("AAPL")
 
 

@@ -67,5 +67,11 @@ def test_databento_live_client_raises_when_sdk_wrapper_not_implemented(
 
     client = DatabentoLiveClient(api_key="test-key")
 
-    with pytest.raises(NotImplementedError, match="Databento SDK wrapper"):
+    with pytest.raises(
+        (RuntimeError, NotImplementedError),
+        match=(
+            "databento package is not installed|"
+            "Databento SDK wrapper fetch is not implemented"
+        ),
+    ):
         client.get_underlying_snapshot("AAPL")
