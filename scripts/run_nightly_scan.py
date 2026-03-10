@@ -4,44 +4,22 @@ from options_algo_v2.adapters.databento_underlying import (
     DatabentoUnderlyingAdapter,
 )
 from options_algo_v2.services.batch_evaluator import evaluate_raw_feature_batch
-from options_algo_v2.services.runtime_mode import get_runtime_mode
 from options_algo_v2.services.sample_feature_factory import (
     build_sample_raw_features_from_snapshot,
 )
 from options_algo_v2.services.scan_artifact_orchestrator import (
     build_and_write_scan_artifact,
 )
+from options_algo_v2.services.underlying_fetcher_factory import (
+    build_underlying_fetcher,
+)
 from options_algo_v2.services.universe_loader import load_universe_symbols
 
 
-def fake_underlying_fetcher(symbol: str) -> dict[str, object]:
-    bullish_prices = {
-        "AAPL": 210.0,
-        "MSFT": 420.0,
-        "NVDA": 140.0,
-        "META": 500.0,
-        "SPY": 520.0,
-        "QQQ": 450.0,
-    }
-
-    close = bullish_prices.get(symbol.upper(), 100.0)
-    volume = 5_000_000 if symbol.upper() in bullish_prices else 2_000_000
-
-    return {
-        "close": close,
-        "volume": volume,
-        "timestamp": "2026-03-10T21:00:00Z",
-    }
-
-
 def run_nightly_scan() -> str:
-    runtime_mode = get_runtime_mode()
-
-    if runtime_mode == "live":
-        raise NotImplementedError("live runtime mode is not wired yet")
-
+    fetcher = build_underlying_fetcher()
     symbols = load_universe_symbols()
-    adapter = DatabentoUnderlyingAdapter(fetcher=fake_underlying_fetcher)
+    adapter = DatabentoUnderlyingAdapter(fetcher=fetcher)
 
     raw_features = []
     for symbol in symbols[:10]:

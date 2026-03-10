@@ -30,5 +30,8 @@ def test_run_nightly_scan_live_mode_not_implemented(
 ) -> None:
     monkeypatch.setenv("OPTIONS_ALGO_RUNTIME_MODE", "live")
 
-    with pytest.raises(NotImplementedError, match="live runtime mode"):
+    with pytest.raises(
+        NotImplementedError,
+        match="live underlying fetcher is not wired yet",
+    ):
         run_nightly_scan()
