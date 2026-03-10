@@ -87,6 +87,12 @@ def test_build_scan_result_returns_expected_structure() -> None:
     assert result.generated_at
     assert result.config_versions["strategy"] == "strategy_v1"
     assert result.config_versions["risk"] == "risk_v1"
+    assert result.runtime_metadata["runtime_mode"] == "mock"
+    assert result.runtime_metadata["databento"] == {
+        "dataset": "XNAS.ITCH",
+        "schema": "ohlcv-1d",
+        "has_api_key": "false",
+    }
     assert result.summary.total_candidates == 2
     assert result.summary.rejection_reason_counts == {
         "market regime does not permit new entries": 1,

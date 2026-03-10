@@ -5,12 +5,16 @@ from datetime import UTC, datetime
 from options_algo_v2.config.rulebook_config import load_rulebook_configs
 from options_algo_v2.domain.decision import CandidateDecision
 from options_algo_v2.domain.scan_result import ScanResult, ScanSummary
+from options_algo_v2.services.databento_runtime_info import (
+    build_databento_runtime_info,
+)
 from options_algo_v2.services.decision_diagnostics import (
     count_rejection_reasons,
     count_signal_states,
     count_strategy_types,
 )
 from options_algo_v2.services.decision_serializer import serialize_candidate_decision
+from options_algo_v2.services.runtime_mode import get_runtime_mode
 
 
 def build_scan_summary(decisions: list[CandidateDecision]) -> ScanSummary:
@@ -46,10 +50,16 @@ def build_scan_result(
     summary = build_scan_summary(decisions)
     serialized_decisions = [serialize_candidate_decision(decision) for decision in decisions]
 
+    runtime_metadata: dict[str, object] = {
+        "runtime_mode": get_runtime_mode(),
+        "databento": build_databento_runtime_info(),
+    }
+
     return ScanResult(
         run_id=run_id,
         generated_at=generated_at,
         config_versions=config_versions,
         summary=summary,
+        runtime_metadata=runtime_metadata,
         decisions=serialized_decisions,
     )

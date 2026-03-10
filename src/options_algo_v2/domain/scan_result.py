@@ -21,4 +21,5 @@ class ScanResult:
     generated_at: str
     config_versions: dict[str, str]
     summary: ScanSummary
+    runtime_metadata: dict[str, object] = field(default_factory=dict)
     decisions: list[dict[str, object]] = field(default_factory=list)
