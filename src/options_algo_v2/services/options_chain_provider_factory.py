@@ -3,76 +3,81 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from options_algo_v2.adapters.live_options_chain_client import (
+    PlaceholderLiveOptionsChainClient,
+)
+from options_algo_v2.adapters.polygon_live_options_chain_client import (
     PolygonLiveOptionsChainClient,
 )
 from options_algo_v2.domain.options_chain import OptionQuote, OptionsChainSnapshot
 from options_algo_v2.domain.options_chain_provider import OptionsChainProvider
-from options_algo_v2.services.polygon_settings import load_polygon_settings
+from options_algo_v2.services.polygon_settings import (
+    PolygonSettings,
+    has_polygon_api_key,
+)
 from options_algo_v2.services.runtime_mode import get_runtime_mode
 
 
 @dataclass(frozen=True)
 class MockOptionsChainProvider:
-    def get_chain(self, *, symbol: str) -> OptionsChainSnapshot:
+    def get_chain(self, symbol: str) -> OptionsChainSnapshot:
         quotes = [
             OptionQuote(
                 symbol=symbol,
-                option_symbol=f"{symbol}_20260417C00145000",
+                option_symbol=f"{symbol}_2026-04-17_C_100",
                 expiration="2026-04-17",
-                strike=145.0,
-                option_type="call",
-                bid=4.8,
-                ask=5.2,
-                mid=5.0,
-                delta=0.42,
-                open_interest=1200,
-                volume=300,
+                strike=100.0,
+                option_type="CALL",
+                bid=2.40,
+                ask=2.60,
+                mid=2.50,
+                delta=0.35,
+                open_interest=1_500,
+                volume=250,
             ),
             OptionQuote(
                 symbol=symbol,
-                option_symbol=f"{symbol}_20260417C00150000",
+                option_symbol=f"{symbol}_2026-04-17_C_105",
                 expiration="2026-04-17",
-                strike=150.0,
-                option_type="call",
-                bid=2.8,
-                ask=3.2,
-                mid=3.0,
-                delta=0.31,
-                open_interest=1100,
-                volume=280,
+                strike=105.0,
+                option_type="CALL",
+                bid=1.40,
+                ask=1.60,
+                mid=1.50,
+                delta=0.22,
+                open_interest=1_200,
+                volume=200,
             ),
             OptionQuote(
                 symbol=symbol,
-                option_symbol=f"{symbol}_20260417P00135000",
+                option_symbol=f"{symbol}_2026-04-17_P_95",
                 expiration="2026-04-17",
-                strike=135.0,
-                option_type="put",
-                bid=2.3,
-                ask=2.7,
-                mid=2.5,
-                delta=-0.28,
-                open_interest=1400,
-                volume=320,
+                strike=95.0,
+                option_type="PUT",
+                bid=1.40,
+                ask=1.60,
+                mid=1.50,
+                delta=-0.22,
+                open_interest=1_200,
+                volume=200,
             ),
             OptionQuote(
                 symbol=symbol,
-                option_symbol=f"{symbol}_20260417P00130000",
+                option_symbol=f"{symbol}_2026-04-17_P_100",
                 expiration="2026-04-17",
-                strike=130.0,
-                option_type="put",
-                bid=1.3,
-                ask=1.7,
-                mid=1.5,
-                delta=-0.19,
-                open_interest=1000,
-                volume=260,
+                strike=100.0,
+                option_type="PUT",
+                bid=2.40,
+                ask=2.60,
+                mid=2.50,
+                delta=-0.35,
+                open_interest=1_500,
+                volume=250,
             ),
         ]
-
         return OptionsChainSnapshot(
             symbol=symbol,
             quotes=quotes,
-            as_of="2026-03-10T21:00:00Z",
+            as_of="2026-03-10T00:00:00Z",
             source="mock",
         )
 
@@ -81,35 +86,30 @@ class MockOptionsChainProvider:
 class LiveOptionsChainProvider:
     client: PolygonLiveOptionsChainClient
 
-    def get_chain(self, *, symbol: str) -> OptionsChainSnapshot:
-        return self.client.get_chain(symbol=symbol)
+    def get_chain(self, symbol: str) -> OptionsChainSnapshot:
+        return self.client.get_chain_snapshot(symbol)
 
 
 def build_options_chain_provider() -> OptionsChainProvider:
     runtime_mode = get_runtime_mode()
 
     if runtime_mode == "live":
-        settings = load_polygon_settings()
+        if not has_polygon_api_key():
+            raise ValueError("POLYGON_API_KEY is required for live options chain mode")
         return LiveOptionsChainProvider(
-            client=PolygonLiveOptionsChainClient(settings=settings),
+            client=PolygonLiveOptionsChainClient(settings=PolygonSettings.from_env())
         )
 
     return MockOptionsChainProvider()
 
 
 def get_options_chain_provider_name() -> str:
-    runtime_mode = get_runtime_mode()
-
-    if runtime_mode == "live":
-        return "polygon"
-
-    return "mock"
+    return "polygon" if get_runtime_mode() == "live" else "mock"
 
 
 def get_options_chain_provider_source() -> str:
-    runtime_mode = get_runtime_mode()
+    return "polygon" if get_runtime_mode() == "live" else "mock"
 
-    if runtime_mode == "live":
-        return "polygon"
 
-    return "mock"
+def build_placeholder_live_options_chain_client() -> PlaceholderLiveOptionsChainClient:
+    return PlaceholderLiveOptionsChainClient()

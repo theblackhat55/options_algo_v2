@@ -31,6 +31,14 @@ def inspect_scan_result(path_str: str) -> int:
         "market_breadth_provider_source="
         f"{runtime_metadata.get('market_breadth_provider_source', 'unknown')}"
     )
+    print(
+        "options_chain_provider="
+        f"{runtime_metadata.get('options_chain_provider', 'unknown')}"
+    )
+    print(
+        "options_chain_provider_source="
+        f"{runtime_metadata.get('options_chain_provider_source', 'unknown')}"
+    )
     print(f"databento_runtime={runtime_metadata.get('databento', {})}")
     print(
         "feature_source_counts_by_historical_row_provider="

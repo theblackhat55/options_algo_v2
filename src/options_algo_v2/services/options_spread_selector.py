@@ -21,7 +21,7 @@ def select_vertical_call_spread_candidates(
     calls = [
         quote
         for quote in chain.quotes
-        if quote.option_type == "call" and quote.expiration == expiration
+        if str(quote.option_type).lower() == "call" and quote.expiration == expiration
     ]
     calls = sorted(calls, key=lambda quote: quote.strike)
 
@@ -46,7 +46,7 @@ def select_vertical_put_spread_candidates(
     puts = [
         quote
         for quote in chain.quotes
-        if quote.option_type == "put" and quote.expiration == expiration
+        if str(quote.option_type).lower() == "put" and quote.expiration == expiration
     ]
     puts = sorted(puts, key=lambda quote: quote.strike, reverse=True)
 

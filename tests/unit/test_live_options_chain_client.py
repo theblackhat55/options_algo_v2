@@ -78,7 +78,7 @@ def test_polygon_live_options_chain_client_normalizes_payload() -> None:
     assert snapshot.quotes[0].option_symbol == "O:AAPL260417C00145000"
     assert snapshot.quotes[0].expiration == "2026-04-17"
     assert snapshot.quotes[0].strike == 145.0
-    assert snapshot.quotes[0].option_type == "call"
+    assert snapshot.quotes[0].option_type == "CALL"
     assert snapshot.quotes[0].bid == 4.8
     assert snapshot.quotes[0].ask == 5.2
     assert snapshot.quotes[0].mid == 5.0

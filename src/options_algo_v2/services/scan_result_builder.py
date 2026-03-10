@@ -29,6 +29,10 @@ from options_algo_v2.services.market_breadth_provider_factory import (
     get_market_breadth_provider_name,
     get_market_breadth_provider_source,
 )
+from options_algo_v2.services.options_chain_provider_factory import (
+    get_options_chain_provider_name,
+    get_options_chain_provider_source,
+)
 from options_algo_v2.services.runtime_mode import get_runtime_mode
 from options_algo_v2.services.scan_trade_candidate_builder import (
     build_serialized_trade_candidates,
@@ -112,6 +116,8 @@ def build_scan_result(
         "historical_row_provider": get_historical_row_provider_name(),
         "market_breadth_provider": get_market_breadth_provider_name(),
         "market_breadth_provider_source": get_market_breadth_provider_source(),
+        "options_chain_provider": get_options_chain_provider_name(),
+        "options_chain_provider_source": get_options_chain_provider_source(),
         "feature_source_counts_by_historical_row_provider": (
             count_feature_sources_by_historical_row_provider(feature_sources)
         ),

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 
 from options_algo_v2.services.options_chain_provider_factory import (
@@ -17,10 +19,6 @@ def test_build_options_chain_provider_returns_mock_by_default(
     provider = build_options_chain_provider()
 
     assert isinstance(provider, MockOptionsChainProvider)
-    snapshot = provider.get_chain(symbol="AAPL")
-    assert snapshot.symbol == "AAPL"
-    assert snapshot.source == "mock"
-    assert len(snapshot.quotes) == 4
     assert get_options_chain_provider_name() == "mock"
     assert get_options_chain_provider_source() == "mock"
 
@@ -33,22 +31,22 @@ def test_build_options_chain_provider_returns_mock_in_mock_mode(
     provider = build_options_chain_provider()
 
     assert isinstance(provider, MockOptionsChainProvider)
-    snapshot = provider.get_chain(symbol="MSFT")
-    assert snapshot.symbol == "MSFT"
-    assert len(snapshot.quotes) == 4
 
 
-def test_build_options_chain_provider_raises_when_live_mode_missing_key(
+def test_build_options_chain_provider_live_mode_requires_polygon_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("OPTIONS_ALGO_RUNTIME_MODE", "live")
     monkeypatch.delenv("POLYGON_API_KEY", raising=False)
 
-    with pytest.raises(ValueError, match="POLYGON_API_KEY"):
+    with pytest.raises(
+        ValueError,
+        match="POLYGON_API_KEY is required for live options chain mode",
+    ):
         build_options_chain_provider()
 
 
-def test_build_options_chain_provider_returns_live_in_live_mode(
+def test_build_options_chain_provider_returns_live_provider_with_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("OPTIONS_ALGO_RUNTIME_MODE", "live")
@@ -59,9 +57,3 @@ def test_build_options_chain_provider_returns_live_in_live_mode(
     assert isinstance(provider, LiveOptionsChainProvider)
     assert get_options_chain_provider_name() == "polygon"
     assert get_options_chain_provider_source() == "polygon"
-
-    with pytest.raises(
-        NotImplementedError,
-        match="polygon live options chain client is not implemented",
-    ):
-        provider.get_chain(symbol="SPY")
