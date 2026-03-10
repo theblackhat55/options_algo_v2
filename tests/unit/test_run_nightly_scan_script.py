@@ -42,25 +42,12 @@ def test_run_nightly_scan_live_mode_requires_databento_key(
         run_nightly_scan()
 
 
-def test_run_nightly_scan_live_mode_with_key_returns_json_path(
+def test_run_nightly_scan_live_mode_with_key_requires_databento_package(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("OPTIONS_ALGO_RUNTIME_MODE", "live")
     monkeypatch.setenv("DATABENTO_API_KEY", "test-key")
 
-    output_path = run_nightly_scan()
-    path = Path(output_path)
+    with pytest.raises(RuntimeError, match="databento package is not installed"):
+        run_nightly_scan()
 
-    assert output_path.endswith(".json")
-    assert path.exists()
-
-    payload = json.loads(path.read_text())
-
-    assert "summary" in payload
-    assert "runtime_metadata" in payload
-    assert payload["runtime_metadata"]["runtime_mode"] == "live"
-    assert payload["runtime_metadata"]["databento"] == {
-        "dataset": "XNAS.ITCH",
-        "schema": "ohlcv-1d",
-        "has_api_key": "true",
-    }

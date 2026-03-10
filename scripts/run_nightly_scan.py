@@ -2,41 +2,24 @@ from __future__ import annotations
 
 from datetime import date
 
-from options_algo_v2.adapters.databento_underlying import (
-    DatabentoUnderlyingAdapter,
-)
 from options_algo_v2.services.batch_evaluator import evaluate_raw_feature_batch
+from options_algo_v2.services.historical_row_provider_factory import (
+    build_historical_row_provider,
+)
 from options_algo_v2.services.live_raw_feature_pipeline import (
     build_live_raw_feature_input,
 )
-from options_algo_v2.services.mock_historical_rows import build_mock_historical_rows
+from options_algo_v2.services.runtime_mode import get_runtime_mode
 from options_algo_v2.services.scan_artifact_orchestrator import (
     build_and_write_scan_artifact,
-)
-from options_algo_v2.services.underlying_fetcher_factory import (
-    build_underlying_fetcher,
 )
 from options_algo_v2.services.universe_loader import load_universe_symbols
 
 
-class MockHistoricalWrapper:
-    def get_bar_rows(
-        self,
-        *,
-        symbol: str,
-        dataset: str,
-        schema: str,
-    ) -> list[dict[str, object]]:
-        del dataset, schema
-        return build_mock_historical_rows(symbol)
-
-
 def run_nightly_scan() -> str:
-    fetcher = build_underlying_fetcher()
-    _adapter = DatabentoUnderlyingAdapter(fetcher=fetcher)
-
+    runtime_mode = get_runtime_mode()
     symbols = load_universe_symbols()
-    wrapper = MockHistoricalWrapper()
+    row_provider = build_historical_row_provider()
 
     raw_features = []
     for symbol in symbols[:10]:
@@ -46,7 +29,7 @@ def run_nightly_scan() -> str:
             symbol=symbol,
             dataset="XNAS.ITCH",
             schema="ohlcv-1d",
-            client_wrapper=wrapper,  # type: ignore[arg-type]
+            client_wrapper=row_provider,  # type: ignore[arg-type]
             adx14=22.0 if is_bullish else 10.0,
             iv_rank=70.0 if is_bullish else 45.0,
             iv_hv_ratio=1.30 if is_bullish else 1.10,
@@ -67,6 +50,7 @@ def run_nightly_scan() -> str:
     decisions = evaluate_raw_feature_batch(raw_features)
     result = build_and_write_scan_artifact(decisions=decisions)
 
+    print(f"runtime_mode={runtime_mode}")
     print(f"run_id={result.scan_result.run_id}")
     print(f"output_path={result.output_path}")
     print(
