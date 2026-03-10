@@ -93,6 +93,18 @@ def inspect_scan_result(path_str: str) -> int:
         f"{runtime_metadata.get('top_trade_candidate_symbols', [])}"
     )
     print(
+        "trade_idea_count="
+        f"{runtime_metadata.get('trade_idea_count', 0)}"
+    )
+    print(
+        "trade_idea_symbols="
+        f"{runtime_metadata.get('trade_idea_symbols', [])}"
+    )
+    print(
+        "trade_idea_counts_by_strategy_family="
+        f"{runtime_metadata.get('trade_idea_counts_by_strategy_family', {})}"
+    )
+    print(
         "top_trade_summary_rows="
         f"{runtime_metadata.get('top_trade_summary_rows', [])}"
     )

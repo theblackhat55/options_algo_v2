@@ -63,6 +63,15 @@ def test_run_nightly_scan_returns_json_path(
         "MSFT",
         "NVDA",
     ]
+    assert payload["runtime_metadata"]["trade_idea_count"] == 3
+    assert payload["runtime_metadata"]["trade_idea_symbols"] == [
+        "AAPL",
+        "MSFT",
+        "NVDA",
+    ]
+    assert payload["runtime_metadata"]["trade_idea_counts_by_strategy_family"] == {
+        "BULL_PUT_SPREAD": 3
+    }
     assert len(payload["runtime_metadata"]["top_trade_summary_rows"]) == 3
     assert payload["runtime_metadata"]["top_trade_summary_rows"][0]["symbol"] == "AAPL"
     assert "trade_candidates" in payload

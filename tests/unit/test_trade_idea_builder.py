@@ -41,6 +41,8 @@ def test_build_trade_idea_returns_expected_shape() -> None:
     assert idea["symbol"] == "AAPL"
     assert idea["strategy_family"] == "BULL_PUT_SPREAD"
     assert idea["expiration"] == "2026-04-17"
+    assert idea["selected_expiration"] == "2026-04-17"
+    assert idea["candidate_expirations_considered"] == ["2026-04-17"]
     assert idea["option_type"] == "PUT"
     assert idea["short_strike"] == 100.0
     assert idea["long_strike"] == 95.0
@@ -48,6 +50,7 @@ def test_build_trade_idea_returns_expected_shape() -> None:
     assert idea["width"] == 5.0
     assert idea["max_risk"] == 4.0
     assert idea["score"] == 0.2
+    assert idea["score_breakdown"] == {"selection_score": 0.2}
     assert idea["market_regime"] == "TREND_UP"
     assert idea["directional_state"] == "BULLISH_CONTINUATION"
     assert idea["iv_state"] == "IV_RICH"

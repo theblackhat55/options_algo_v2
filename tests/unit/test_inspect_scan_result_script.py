@@ -35,6 +35,9 @@ def test_inspect_scan_result_returns_zero_for_valid_file(
             "ranked_trade_candidate_counts_by_strategy_family": {"BULL_PUT_SPREAD": 1},
             "ranked_trade_candidate_symbols": ["AAPL"],
             "top_trade_candidate_symbols": ["AAPL"],
+            "trade_idea_count": 1,
+            "trade_idea_symbols": ["AAPL"],
+            "trade_idea_counts_by_strategy_family": {"BULL_PUT_SPREAD": 1},
             "top_trade_summary_rows": [
                 {
                     "symbol": "AAPL",
@@ -148,6 +151,9 @@ def test_inspect_scan_result_returns_zero_for_valid_file(
     assert "ranked_trade_candidate_counts_by_strategy_family={'BULL_PUT_SPREAD': 1}" in captured.out
     assert "ranked_trade_candidate_symbols=['AAPL']" in captured.out
     assert "top_trade_candidate_symbols=['AAPL']" in captured.out
+    assert "trade_idea_count=1" in captured.out
+    assert "trade_idea_symbols=['AAPL']" in captured.out
+    assert "trade_idea_counts_by_strategy_family={'BULL_PUT_SPREAD': 1}" in captured.out
     assert "top_trade_summary_rows=[{'symbol': 'AAPL'" in captured.out
     assert "feature_sources=[{'symbol': 'AAPL'" in captured.out
     assert "trade_candidates=[{'symbol': 'AAPL'" in captured.out

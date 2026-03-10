@@ -62,6 +62,10 @@ from options_algo_v2.services.trade_candidate_selection_diagnostics import (
 from options_algo_v2.services.trade_idea_builder import (
     build_trade_ideas,
 )
+from options_algo_v2.services.trade_idea_diagnostics import (
+    count_trade_ideas_by_strategy_family,
+    list_trade_idea_symbols,
+)
 
 
 def build_scan_summary(decisions: list[CandidateDecision]) -> ScanSummary:
@@ -182,6 +186,11 @@ def build_scan_result(
         "top_trade_candidate_symbols": [
             str(item.get("symbol", "unknown")) for item in top_trade_candidates
         ],
+        "trade_idea_count": len(trade_ideas),
+        "trade_idea_symbols": list_trade_idea_symbols(trade_ideas),
+        "trade_idea_counts_by_strategy_family": (
+            count_trade_ideas_by_strategy_family(trade_ideas)
+        ),
         "top_trade_summary_rows": top_trade_summary_rows,
     }
 

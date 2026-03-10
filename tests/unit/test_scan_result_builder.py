@@ -115,6 +115,11 @@ def test_build_scan_result_returns_expected_structure() -> None:
     }
     assert result.runtime_metadata["ranked_trade_candidate_symbols"] == ["AAPL"]
     assert result.runtime_metadata["top_trade_candidate_symbols"] == ["AAPL"]
+    assert result.runtime_metadata["trade_idea_count"] == 1
+    assert result.runtime_metadata["trade_idea_symbols"] == ["AAPL"]
+    assert result.runtime_metadata["trade_idea_counts_by_strategy_family"] == {
+        "BULL_PUT_SPREAD": 1
+    }
     assert len(result.runtime_metadata["top_trade_summary_rows"]) == 1
     assert result.runtime_metadata["top_trade_summary_rows"][0]["symbol"] == "AAPL"
     assert result.summary.total_candidates == 2

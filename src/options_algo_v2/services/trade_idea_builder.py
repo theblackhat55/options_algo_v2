@@ -7,6 +7,8 @@ class TradeIdea(TypedDict):
     symbol: str
     strategy_family: str
     expiration: str
+    selected_expiration: str
+    candidate_expirations_considered: list[str]
     option_type: str
     short_leg_option_symbol: str
     long_leg_option_symbol: str
@@ -17,6 +19,7 @@ class TradeIdea(TypedDict):
     width: float
     max_risk: float
     score: float
+    score_breakdown: dict[str, float]
     market_regime: str
     directional_state: str
     iv_state: str
@@ -59,6 +62,7 @@ def build_trade_idea(
     decision: dict[str, object],
 ) -> TradeIdea:
     strategy_family = str(trade_candidate.get("strategy_family", "UNKNOWN"))
+    expiration = str(trade_candidate.get("expiration", ""))
     width = _to_float(trade_candidate.get("width", 0.0))
     net_credit = _to_float(trade_candidate.get("net_credit", 0.0))
     net_debit = _to_float(trade_candidate.get("net_debit", 0.0))
@@ -76,7 +80,9 @@ def build_trade_idea(
     return {
         "symbol": str(trade_candidate.get("symbol", "UNKNOWN")),
         "strategy_family": strategy_family,
-        "expiration": str(trade_candidate.get("expiration", "")),
+        "expiration": expiration,
+        "selected_expiration": expiration,
+        "candidate_expirations_considered": [expiration],
         "option_type": option_type,
         "short_leg_option_symbol": _extract_nested_str(
             trade_candidate, "short_leg", "option_symbol"
@@ -91,6 +97,9 @@ def build_trade_idea(
         "width": width,
         "max_risk": round(max_risk, 4),
         "score": round(score, 4),
+        "score_breakdown": {
+            "selection_score": round(score, 4),
+        },
         "market_regime": str(decision.get("market_regime", "UNKNOWN")),
         "directional_state": str(decision.get("directional_state", "UNKNOWN")),
         "iv_state": str(decision.get("iv_state", "UNKNOWN")),
