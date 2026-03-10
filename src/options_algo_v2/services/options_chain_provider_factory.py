@@ -3,10 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from options_algo_v2.adapters.live_options_chain_client import (
-    PlaceholderLiveOptionsChainClient,
+    PolygonLiveOptionsChainClient,
 )
 from options_algo_v2.domain.options_chain import OptionQuote, OptionsChainSnapshot
 from options_algo_v2.domain.options_chain_provider import OptionsChainProvider
+from options_algo_v2.services.polygon_settings import load_polygon_settings
 from options_algo_v2.services.runtime_mode import get_runtime_mode
 
 
@@ -78,7 +79,7 @@ class MockOptionsChainProvider:
 
 @dataclass(frozen=True)
 class LiveOptionsChainProvider:
-    client: PlaceholderLiveOptionsChainClient
+    client: PolygonLiveOptionsChainClient
 
     def get_chain(self, *, symbol: str) -> OptionsChainSnapshot:
         return self.client.get_chain(symbol=symbol)
@@ -88,8 +89,9 @@ def build_options_chain_provider() -> OptionsChainProvider:
     runtime_mode = get_runtime_mode()
 
     if runtime_mode == "live":
+        settings = load_polygon_settings()
         return LiveOptionsChainProvider(
-            client=PlaceholderLiveOptionsChainClient(),
+            client=PolygonLiveOptionsChainClient(settings=settings),
         )
 
     return MockOptionsChainProvider()
@@ -99,7 +101,7 @@ def get_options_chain_provider_name() -> str:
     runtime_mode = get_runtime_mode()
 
     if runtime_mode == "live":
-        return "live"
+        return "polygon"
 
     return "mock"
 
@@ -108,6 +110,6 @@ def get_options_chain_provider_source() -> str:
     runtime_mode = get_runtime_mode()
 
     if runtime_mode == "live":
-        return "live_options_placeholder"
+        return "polygon"
 
     return "mock"

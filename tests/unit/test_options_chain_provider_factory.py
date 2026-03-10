@@ -38,19 +38,30 @@ def test_build_options_chain_provider_returns_mock_in_mock_mode(
     assert len(snapshot.quotes) == 4
 
 
+def test_build_options_chain_provider_raises_when_live_mode_missing_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPTIONS_ALGO_RUNTIME_MODE", "live")
+    monkeypatch.delenv("POLYGON_API_KEY", raising=False)
+
+    with pytest.raises(ValueError, match="POLYGON_API_KEY"):
+        build_options_chain_provider()
+
+
 def test_build_options_chain_provider_returns_live_in_live_mode(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("OPTIONS_ALGO_RUNTIME_MODE", "live")
+    monkeypatch.setenv("POLYGON_API_KEY", "test-key")
 
     provider = build_options_chain_provider()
 
     assert isinstance(provider, LiveOptionsChainProvider)
-    assert get_options_chain_provider_name() == "live"
-    assert get_options_chain_provider_source() == "live_options_placeholder"
+    assert get_options_chain_provider_name() == "polygon"
+    assert get_options_chain_provider_source() == "polygon"
 
     with pytest.raises(
         NotImplementedError,
-        match="live options chain client is not implemented",
+        match="polygon live options chain client is not implemented",
     ):
         provider.get_chain(symbol="SPY")
