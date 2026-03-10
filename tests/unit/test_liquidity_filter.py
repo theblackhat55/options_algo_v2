@@ -11,6 +11,13 @@ def test_liquidity_filter_passes_for_valid_liquid_setup() -> None:
         ask=2.55,
         option_quote_age_seconds=20,
         underlying_quote_age_seconds=3,
+        min_underlying_price=20.0,
+        min_avg_daily_volume=1_000_000,
+        min_option_open_interest=500,
+        min_option_volume=100,
+        max_bid_ask_spread_pct=0.08,
+        max_option_quote_age_seconds=60,
+        max_underlying_quote_age_seconds=10,
     )
 
     assert result.passed is True
@@ -27,6 +34,13 @@ def test_liquidity_filter_rejects_multiple_failures() -> None:
         ask=1.20,
         option_quote_age_seconds=120,
         underlying_quote_age_seconds=30,
+        min_underlying_price=20.0,
+        min_avg_daily_volume=1_000_000,
+        min_option_open_interest=500,
+        min_option_volume=100,
+        max_bid_ask_spread_pct=0.08,
+        max_option_quote_age_seconds=60,
+        max_underlying_quote_age_seconds=10,
     )
 
     assert result.passed is False
@@ -43,6 +57,13 @@ def test_liquidity_filter_rejects_invalid_quote() -> None:
         ask=2.00,
         option_quote_age_seconds=10,
         underlying_quote_age_seconds=5,
+        min_underlying_price=20.0,
+        min_avg_daily_volume=1_000_000,
+        min_option_open_interest=500,
+        min_option_volume=100,
+        max_bid_ask_spread_pct=0.08,
+        max_option_quote_age_seconds=60,
+        max_underlying_quote_age_seconds=10,
     )
 
     assert result.passed is False
@@ -59,6 +80,13 @@ def test_liquidity_filter_rejects_wide_spread() -> None:
         ask=1.20,
         option_quote_age_seconds=10,
         underlying_quote_age_seconds=5,
+        min_underlying_price=20.0,
+        min_avg_daily_volume=1_000_000,
+        min_option_open_interest=500,
+        min_option_volume=100,
+        max_bid_ask_spread_pct=0.08,
+        max_option_quote_age_seconds=60,
+        max_underlying_quote_age_seconds=10,
     )
 
     assert result.passed is False

@@ -1,43 +1,15 @@
 version: risk_v1
-description: MVP risk and portfolio controls for options_algo_v2
 
-universe_filters:
-  min_underlying_price: 20.0
-  min_avg_stock_volume_20d: 1000000
+min_underlying_price: 20.0
+min_avg_daily_volume: 1000000
+min_option_open_interest: 500
+min_option_volume: 100
 
-liquidity:
-  min_open_interest: 500
-  min_previous_day_option_volume: 100
-  max_bid_ask_spread_pct_of_mid: 8.0
-  max_underlying_quote_age_seconds: 10
-  max_option_quote_age_seconds: 60
+max_bid_ask_spread_pct: 0.08
+max_option_quote_age_seconds: 60
+max_underlying_quote_age_seconds: 10
 
-spread_width_policy:
-  price_20_to_50_max_width: 2.5
-  price_50_to_150_max_width: 5.0
-  price_150_plus_max_width: 5.0
-
-position_sizing:
-  max_risk_per_trade_pct: 1.0
-  max_open_positions: 5
-  max_same_direction_pct: 60.0
-  max_positions_per_underlying: 1
-  max_positions_per_sector: 2
-
-event_rules:
-  credit_exit_dte_buffer: 7
-  debit_exit_dte_buffer: 10
-  credit_max_holding_days: 21
-  debit_max_holding_days: 14
-  optional_post_exit_earnings_buffer_days: 2
-
-execution:
-  max_slippage_pct_from_mid: 10.0
-  max_repricing_attempts: 3
-  max_repricing_window_minutes: 5
-
-exit_rules:
-  credit_profit_target_pct_of_credit: 50.0
-  credit_stop_multiple_of_credit: 2.0
-  debit_profit_target_pct_of_max_profit: 50.0
-  debit_stop_loss_pct_of_debit: 50.0
+max_risk_per_trade_pct: 1.0
+max_open_positions: 5
+max_same_direction_pct: 60.0
+max_positions_per_sector: 2

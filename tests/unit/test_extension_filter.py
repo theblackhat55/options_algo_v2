@@ -8,6 +8,7 @@ def test_extension_filter_passes_for_non_extended_bullish_setup() -> None:
         close=103.0,
         dma20=100.0,
         atr20=2.0,
+        extension_atr_multiple=1.5,
     )
 
     assert result.passed is True
@@ -19,6 +20,7 @@ def test_extension_filter_rejects_extended_bullish_setup() -> None:
         close=104.0,
         dma20=100.0,
         atr20=2.0,
+        extension_atr_multiple=1.5,
     )
 
     assert result.passed is False
@@ -31,6 +33,7 @@ def test_extension_filter_passes_for_non_extended_bearish_setup() -> None:
         close=97.5,
         dma20=100.0,
         atr20=2.0,
+        extension_atr_multiple=1.5,
     )
 
     assert result.passed is True
@@ -42,6 +45,7 @@ def test_extension_filter_rejects_extended_bearish_setup() -> None:
         close=96.0,
         dma20=100.0,
         atr20=2.0,
+        extension_atr_multiple=1.5,
     )
 
     assert result.passed is False
@@ -54,6 +58,7 @@ def test_extension_filter_rejects_negative_atr() -> None:
         close=100.0,
         dma20=100.0,
         atr20=-1.0,
+        extension_atr_multiple=1.5,
     )
 
     assert result.passed is False

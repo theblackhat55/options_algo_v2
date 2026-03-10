@@ -6,16 +6,6 @@ from typing import Any
 
 import yaml
 
-CONFIG_DIR = Path("config")
-
-
-def _load_yaml(path: Path) -> dict[str, Any]:
-    with path.open("r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-    if not isinstance(data, dict):
-        raise ValueError(f"Invalid YAML config at {path}")
-    return data
-
 
 @dataclass(frozen=True)
 class RulebookConfigSet:
@@ -24,14 +14,23 @@ class RulebookConfigSet:
     risk: dict[str, Any]
 
 
-def load_rulebook_configs(
-    universe_file: str = "universe_v1.yaml",
-    strategy_file: str = "strategy_v1.yaml",
-    risk_file: str = "risk_v1.yaml",
-) -> RulebookConfigSet:
-    universe = _load_yaml(CONFIG_DIR / universe_file)
-    strategy = _load_yaml(CONFIG_DIR / strategy_file)
-    risk = _load_yaml(CONFIG_DIR / risk_file)
+def _load_yaml(path: Path) -> dict[str, Any]:
+    with path.open("r", encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+
+    if not isinstance(data, dict):
+        msg = f"expected mapping at top level in {path}"
+        raise ValueError(msg)
+
+    return data
+
+
+def load_rulebook_configs(config_dir: str | Path = "config") -> RulebookConfigSet:
+    base_path = Path(config_dir)
+
+    universe = _load_yaml(base_path / "universe_v1.yaml")
+    strategy = _load_yaml(base_path / "strategy_v1.yaml")
+    risk = _load_yaml(base_path / "risk_v1.yaml")
 
     return RulebookConfigSet(
         universe=universe,

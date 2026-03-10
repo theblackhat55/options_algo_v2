@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
+from options_algo_v2.config.rulebook_config import load_rulebook_configs
 from options_algo_v2.domain.decision import CandidateDecision
 from options_algo_v2.domain.enums import SignalState
 from options_algo_v2.services.candidate_ranker import score_candidate
@@ -32,6 +33,10 @@ def evaluate_candidate_decision(
     atr20: float,
     expected_move_fit: bool,
 ) -> CandidateDecision:
+    config = load_rulebook_configs()
+    risk = config.risk
+    strategy = config.strategy
+
     candidate = select_strategy_candidate(
         symbol=symbol,
         market_regime=market_regime,
@@ -55,12 +60,22 @@ def evaluate_candidate_decision(
                 ask=ask,
                 option_quote_age_seconds=option_quote_age_seconds,
                 underlying_quote_age_seconds=underlying_quote_age_seconds,
+                min_underlying_price=float(risk["min_underlying_price"]),
+                min_avg_daily_volume=float(risk["min_avg_daily_volume"]),
+                min_option_open_interest=int(risk["min_option_open_interest"]),
+                min_option_volume=int(risk["min_option_volume"]),
+                max_bid_ask_spread_pct=float(risk["max_bid_ask_spread_pct"]),
+                max_option_quote_age_seconds=int(risk["max_option_quote_age_seconds"]),
+                max_underlying_quote_age_seconds=int(
+                    risk["max_underlying_quote_age_seconds"]
+                ),
             ),
             extension_result=passes_extension_filter(
                 directional_state=directional_state,
                 close=close,
                 dma20=dma20,
                 atr20=atr20,
+                extension_atr_multiple=float(strategy["extension_atr_multiple"]),
             ),
             final_passed=False,
             final_score=0.0,
@@ -81,6 +96,13 @@ def evaluate_candidate_decision(
         ask=ask,
         option_quote_age_seconds=option_quote_age_seconds,
         underlying_quote_age_seconds=underlying_quote_age_seconds,
+        min_underlying_price=float(risk["min_underlying_price"]),
+        min_avg_daily_volume=float(risk["min_avg_daily_volume"]),
+        min_option_open_interest=int(risk["min_option_open_interest"]),
+        min_option_volume=int(risk["min_option_volume"]),
+        max_bid_ask_spread_pct=float(risk["max_bid_ask_spread_pct"]),
+        max_option_quote_age_seconds=int(risk["max_option_quote_age_seconds"]),
+        max_underlying_quote_age_seconds=int(risk["max_underlying_quote_age_seconds"]),
     )
 
     extension_result = passes_extension_filter(
@@ -88,6 +110,7 @@ def evaluate_candidate_decision(
         close=close,
         dma20=dma20,
         atr20=atr20,
+        extension_atr_multiple=float(strategy["extension_atr_multiple"]),
     )
 
     final_passed = (
