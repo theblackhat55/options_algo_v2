@@ -13,3 +13,4 @@ max_risk_per_trade_pct: 1.0
 max_open_positions: 5
 max_same_direction_pct: 60.0
 max_positions_per_sector: 2
+min_candidate_score: 70.0

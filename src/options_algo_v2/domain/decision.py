@@ -14,4 +14,5 @@ class CandidateDecision:
     extension_result: QualificationResult
     final_passed: bool
     final_score: float
+    min_score_required: float
     rejection_reasons: list[str] = field(default_factory=list)
