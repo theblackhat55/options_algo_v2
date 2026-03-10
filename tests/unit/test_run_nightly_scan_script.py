@@ -40,6 +40,9 @@ def test_run_nightly_scan_returns_json_path(
     assert payload["runtime_metadata"][
         "feature_source_counts_by_dataset_schema"
     ] == {"XNAS.ITCH|ohlcv-1d": 10}
+    assert payload["runtime_metadata"]["trade_candidate_counts_by_strategy_family"] == {}
+    assert payload["runtime_metadata"]["trade_candidate_counts_by_symbol"] == {}
+    assert "trade_candidates" in payload
     assert len(payload["feature_sources"]) == 10
     assert payload["feature_sources"][0]["historical_row_provider"] == "mock"
     assert payload["feature_sources"][0]["market_breadth_provider"] == "mock"

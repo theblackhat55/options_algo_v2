@@ -29,6 +29,8 @@ def test_inspect_scan_result_returns_zero_for_valid_file(
             "feature_source_counts_by_historical_row_provider": {"mock": 2},
             "feature_source_counts_by_market_breadth_provider": {"mock": 2},
             "feature_source_counts_by_dataset_schema": {"XNAS.ITCH|ohlcv-1d": 2},
+            "trade_candidate_counts_by_strategy_family": {},
+            "trade_candidate_counts_by_symbol": {},
         },
         "feature_sources": [
             {
@@ -46,6 +48,7 @@ def test_inspect_scan_result_returns_zero_for_valid_file(
                 "schema": "ohlcv-1d",
             },
         ],
+        "trade_candidates": [],
         "summary": {
             "total_candidates": 10,
             "total_passed": 3,
@@ -92,7 +95,10 @@ def test_inspect_scan_result_returns_zero_for_valid_file(
     assert (
         "feature_source_counts_by_dataset_schema={'XNAS.ITCH|ohlcv-1d': 2}"
     ) in captured.out
+    assert "trade_candidate_counts_by_strategy_family={}" in captured.out
+    assert "trade_candidate_counts_by_symbol={}" in captured.out
     assert "feature_sources=[{'symbol': 'AAPL'" in captured.out
+    assert "trade_candidates=[]" in captured.out
     assert "summary=total=10,passed=3,rejected=7" in captured.out
 
 

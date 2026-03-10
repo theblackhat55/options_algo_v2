@@ -44,9 +44,20 @@ def inspect_scan_result(path_str: str) -> int:
         "feature_source_counts_by_dataset_schema="
         f"{runtime_metadata.get('feature_source_counts_by_dataset_schema', {})}"
     )
+    print(
+        "trade_candidate_counts_by_strategy_family="
+        f"{runtime_metadata.get('trade_candidate_counts_by_strategy_family', {})}"
+    )
+    print(
+        "trade_candidate_counts_by_symbol="
+        f"{runtime_metadata.get('trade_candidate_counts_by_symbol', {})}"
+    )
 
     feature_sources = payload.get("feature_sources", [])
     print(f"feature_sources={feature_sources}")
+
+    trade_candidates = payload.get("trade_candidates", [])
+    print(f"trade_candidates={trade_candidates}")
 
     summary = payload.get("summary", {})
     print(

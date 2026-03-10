@@ -30,6 +30,10 @@ from options_algo_v2.services.market_breadth_provider_factory import (
     get_market_breadth_provider_source,
 )
 from options_algo_v2.services.runtime_mode import get_runtime_mode
+from options_algo_v2.services.trade_candidate_diagnostics import (
+    count_trade_candidates_by_strategy_family,
+    count_trade_candidates_by_symbol,
+)
 
 
 def build_scan_summary(decisions: list[CandidateDecision]) -> ScanSummary:
@@ -79,6 +83,7 @@ def build_scan_result(
             for decision in decisions
         )
     ]
+    trade_candidates: list[dict[str, object]] = []
 
     runtime_metadata: dict[str, object] = {
         "runtime_mode": get_runtime_mode(),
@@ -95,6 +100,12 @@ def build_scan_result(
         "feature_source_counts_by_dataset_schema": (
             count_feature_sources_by_dataset_schema(feature_sources)
         ),
+        "trade_candidate_counts_by_strategy_family": (
+            count_trade_candidates_by_strategy_family(trade_candidates)
+        ),
+        "trade_candidate_counts_by_symbol": (
+            count_trade_candidates_by_symbol(trade_candidates)
+        ),
     }
 
     return ScanResult(
@@ -104,5 +115,6 @@ def build_scan_result(
         summary=summary,
         runtime_metadata=runtime_metadata,
         feature_sources=feature_sources,
+        trade_candidates=trade_candidates,
         decisions=serialized_decisions,
     )

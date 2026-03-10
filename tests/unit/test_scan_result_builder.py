@@ -105,6 +105,8 @@ def test_build_scan_result_returns_expected_structure() -> None:
     assert result.runtime_metadata[
         "feature_source_counts_by_dataset_schema"
     ] == {"XNAS.ITCH|ohlcv-1d": 2}
+    assert result.runtime_metadata["trade_candidate_counts_by_strategy_family"] == {}
+    assert result.runtime_metadata["trade_candidate_counts_by_symbol"] == {}
     assert result.summary.total_candidates == 2
     assert result.summary.rejection_reason_counts == {
         "market regime does not permit new entries": 1,

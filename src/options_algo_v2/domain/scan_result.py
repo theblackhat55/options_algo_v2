@@ -23,4 +23,5 @@ class ScanResult:
     summary: ScanSummary
     runtime_metadata: dict[str, object] = field(default_factory=dict)
     feature_sources: list[dict[str, str]] = field(default_factory=list)
+    trade_candidates: list[dict[str, object]] = field(default_factory=list)
     decisions: list[dict[str, object]] = field(default_factory=list)
