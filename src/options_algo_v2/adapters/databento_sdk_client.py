@@ -28,6 +28,36 @@ def _load_databento_module() -> ModuleType:
     return databento
 
 
+def _require_row_key(row: dict[str, object], key: str) -> object:
+    if key not in row:
+        raise ValueError(f"missing '{key}' in databento row")
+    return row[key]
+
+
+def _parse_positive_close(value: object) -> float:
+    try:
+        parsed = float(cast(float | int | str, value))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("invalid 'close' value in databento row") from exc
+
+    if parsed <= 0:
+        raise ValueError("close must be positive in databento row")
+
+    return parsed
+
+
+def _parse_non_negative_volume(value: object) -> float:
+    try:
+        parsed = float(cast(float | int | str, value))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("invalid 'volume' value in databento row") from exc
+
+    if parsed < 0:
+        raise ValueError("volume cannot be negative in databento row")
+
+    return parsed
+
+
 @dataclass(frozen=True)
 class DatabentoHistoricalClientWrapper:
     api_key: str
@@ -55,11 +85,12 @@ class DatabentoHistoricalClientWrapper:
             raise ValueError(f"no databento rows returned for symbol={symbol}")
 
         last_row = rows[-1]
-        close_value = cast(float | int | str, last_row["close"])
-        volume_value = cast(float | int | str, last_row["volume"])
+        close_value = _require_row_key(last_row, "close")
+        volume_value = _require_row_key(last_row, "volume")
+        timestamp_value = _require_row_key(last_row, "ts_event")
 
         return {
-            "close": float(close_value),
-            "volume": float(volume_value),
-            "timestamp": str(last_row["ts_event"]),
+            "close": _parse_positive_close(close_value),
+            "volume": _parse_non_negative_volume(volume_value),
+            "timestamp": str(timestamp_value),
         }
