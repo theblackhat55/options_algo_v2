@@ -37,6 +37,10 @@ from options_algo_v2.services.trade_candidate_diagnostics import (
     count_trade_candidates_by_strategy_family,
     count_trade_candidates_by_symbol,
 )
+from options_algo_v2.services.trade_candidate_ranking import (
+    rank_trade_candidates,
+    select_top_trade_candidates,
+)
 
 
 def build_scan_summary(decisions: list[CandidateDecision]) -> ScanSummary:
@@ -92,6 +96,11 @@ def build_scan_result(
         min_open_interest=900,
         max_bid_ask_spread_width=0.5,
     )
+    ranked_trade_candidates = rank_trade_candidates(trade_candidates)
+    top_trade_candidates = select_top_trade_candidates(
+        ranked_trade_candidates,
+        top_n=3,
+    )
 
     runtime_metadata: dict[str, object] = {
         "runtime_mode": get_runtime_mode(),
@@ -114,6 +123,9 @@ def build_scan_result(
         "trade_candidate_counts_by_symbol": (
             count_trade_candidates_by_symbol(trade_candidates)
         ),
+        "top_trade_candidate_symbols": [
+            str(item.get("symbol", "unknown")) for item in top_trade_candidates
+        ],
     }
 
     return ScanResult(
@@ -123,6 +135,6 @@ def build_scan_result(
         summary=summary,
         runtime_metadata=runtime_metadata,
         feature_sources=feature_sources,
-        trade_candidates=trade_candidates,
+        trade_candidates=ranked_trade_candidates,
         decisions=serialized_decisions,
     )

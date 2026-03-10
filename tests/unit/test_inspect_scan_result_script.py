@@ -31,6 +31,7 @@ def test_inspect_scan_result_returns_zero_for_valid_file(
             "feature_source_counts_by_dataset_schema": {"XNAS.ITCH|ohlcv-1d": 2},
             "trade_candidate_counts_by_strategy_family": {"BULL_PUT_SPREAD": 1},
             "trade_candidate_counts_by_symbol": {"AAPL": 1},
+            "top_trade_candidate_symbols": ["AAPL"],
         },
         "feature_sources": [
             {
@@ -130,6 +131,7 @@ def test_inspect_scan_result_returns_zero_for_valid_file(
         "trade_candidate_counts_by_strategy_family={'BULL_PUT_SPREAD': 1}"
     ) in captured.out
     assert "trade_candidate_counts_by_symbol={'AAPL': 1}" in captured.out
+    assert "top_trade_candidate_symbols=['AAPL']" in captured.out
     assert "feature_sources=[{'symbol': 'AAPL'" in captured.out
     assert "trade_candidates=[{'symbol': 'AAPL'" in captured.out
     assert "summary=total=10,passed=3,rejected=7" in captured.out

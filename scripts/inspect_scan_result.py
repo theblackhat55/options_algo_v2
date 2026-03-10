@@ -52,6 +52,10 @@ def inspect_scan_result(path_str: str) -> int:
         "trade_candidate_counts_by_symbol="
         f"{runtime_metadata.get('trade_candidate_counts_by_symbol', {})}"
     )
+    print(
+        "top_trade_candidate_symbols="
+        f"{runtime_metadata.get('top_trade_candidate_symbols', [])}"
+    )
 
     feature_sources = payload.get("feature_sources", [])
     print(f"feature_sources={feature_sources}")

@@ -109,6 +109,7 @@ def test_build_scan_result_returns_expected_structure() -> None:
         "BULL_PUT_SPREAD": 1
     }
     assert result.runtime_metadata["trade_candidate_counts_by_symbol"] == {"AAPL": 1}
+    assert result.runtime_metadata["top_trade_candidate_symbols"] == ["AAPL"]
     assert result.summary.total_candidates == 2
     assert result.summary.rejection_reason_counts == {
         "market regime does not permit new entries": 1,
