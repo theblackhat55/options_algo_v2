@@ -88,6 +88,21 @@ def _parse_timestamp(value: object) -> str:
     raise ValueError("invalid 'ts_event' value in databento row")
 
 
+def _build_get_range_kwargs(
+    *,
+    symbol: str,
+    dataset: str,
+    schema: str,
+) -> dict[str, object]:
+    return {
+        "dataset": dataset,
+        "schema": schema,
+        "symbols": symbol,
+        "stype_in": "raw_symbol",
+        "limit": 100,
+    }
+
+
 @dataclass(frozen=True)
 class DatabentoHistoricalClientWrapper:
     api_key: str
@@ -105,9 +120,11 @@ class DatabentoHistoricalClientWrapper:
     ) -> dict[str, object]:
         client = self.build_client()
         response = client.timeseries.get_range(
-            dataset=dataset,
-            schema=schema,
-            symbols=symbol,
+            **_build_get_range_kwargs(
+                symbol=symbol,
+                dataset=dataset,
+                schema=schema,
+            )
         )
         rows = response.to_list()
 

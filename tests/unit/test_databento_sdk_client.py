@@ -6,6 +6,7 @@ import pytest
 
 from options_algo_v2.adapters.databento_sdk_client import (
     DatabentoHistoricalClientWrapper,
+    _build_get_range_kwargs,
     _load_databento_module,
 )
 
@@ -21,6 +22,22 @@ def test_load_databento_module_raises_when_package_missing() -> None:
 
     with pytest.raises(RuntimeError, match="databento package is not installed"):
         _load_databento_module()
+
+
+def test_build_get_range_kwargs_returns_expected_mapping() -> None:
+    kwargs = _build_get_range_kwargs(
+        symbol="AAPL",
+        dataset="XNAS.ITCH",
+        schema="ohlcv-1d",
+    )
+
+    assert kwargs == {
+        "dataset": "XNAS.ITCH",
+        "schema": "ohlcv-1d",
+        "symbols": "AAPL",
+        "stype_in": "raw_symbol",
+        "limit": 100,
+    }
 
 
 def test_build_client_uses_databento_historical(
@@ -40,6 +57,49 @@ def test_build_client_uses_databento_historical(
 
     assert isinstance(client, FakeHistorical)
     assert created["api_key"] == "live-key"
+
+
+def test_databento_sdk_wrapper_calls_get_range_with_expected_kwargs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeResponse:
+        def to_list(self) -> list[dict[str, object]]:
+            return [
+                {
+                    "close": 101.5,
+                    "volume": 1_250_000,
+                    "ts_event": "2026-03-10T21:00:00Z",
+                }
+            ]
+
+    class FakeTimeseries:
+        def get_range(self, **kwargs: object) -> FakeResponse:
+            captured.update(kwargs)
+            return FakeResponse()
+
+    class FakeHistorical:
+        def __init__(self, api_key: str) -> None:
+            self.timeseries = FakeTimeseries()
+
+    fake_module = SimpleNamespace(Historical=FakeHistorical)
+    monkeypatch.setitem(sys.modules, "databento", fake_module)
+
+    wrapper = DatabentoHistoricalClientWrapper(api_key="test-key")
+    wrapper.get_underlying_snapshot(
+        symbol="AAPL",
+        dataset="XNAS.ITCH",
+        schema="ohlcv-1d",
+    )
+
+    assert captured == {
+        "dataset": "XNAS.ITCH",
+        "schema": "ohlcv-1d",
+        "symbols": "AAPL",
+        "stype_in": "raw_symbol",
+        "limit": 100,
+    }
 
 
 def test_databento_sdk_wrapper_parses_last_row(
