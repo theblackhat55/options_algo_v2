@@ -49,5 +49,5 @@ def test_build_underlying_fetcher_returns_live_callable_when_key_present(
 
     fetcher = build_underlying_fetcher()
 
-    with pytest.raises(NotImplementedError, match="live databento fetcher"):
+    with pytest.raises(NotImplementedError, match="Databento live client"):
         fetcher("AAPL")

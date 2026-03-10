@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from options_algo_v2.adapters.databento_live_client import DatabentoLiveClient
+from options_algo_v2.domain.live_clients import UnderlyingLiveClient
 from options_algo_v2.services.databento_env import get_databento_api_key
 from options_algo_v2.services.runtime_mode import get_runtime_mode
 
@@ -27,10 +29,11 @@ def _mock_underlying_fetcher(symbol: str) -> dict[str, object]:
 
 
 def _build_live_underlying_fetcher() -> Callable[[str], dict[str, object]]:
-    _api_key = get_databento_api_key()
+    api_key = get_databento_api_key()
+    client: UnderlyingLiveClient = DatabentoLiveClient(api_key=api_key)
 
     def _live_underlying_fetcher(symbol: str) -> dict[str, object]:
-        raise NotImplementedError("live databento fetcher is not implemented")
+        return client.get_underlying_snapshot(symbol)
 
     return _live_underlying_fetcher
 
