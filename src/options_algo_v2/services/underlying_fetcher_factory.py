@@ -7,6 +7,13 @@ from options_algo_v2.domain.live_clients import UnderlyingLiveClient
 from options_algo_v2.services.databento_env import get_databento_api_key
 from options_algo_v2.services.runtime_mode import get_runtime_mode
 
+LiveClientBuilder = Callable[[str], UnderlyingLiveClient]
+UnderlyingFetcher = Callable[[str], dict[str, object]]
+
+
+def build_databento_live_client(api_key: str) -> UnderlyingLiveClient:
+    return DatabentoLiveClient(api_key=api_key)
+
 
 def _mock_underlying_fetcher(symbol: str) -> dict[str, object]:
     bullish_prices = {
@@ -28,9 +35,12 @@ def _mock_underlying_fetcher(symbol: str) -> dict[str, object]:
     }
 
 
-def _build_live_underlying_fetcher() -> Callable[[str], dict[str, object]]:
+def _build_live_underlying_fetcher(
+    client_builder: LiveClientBuilder | None = None,
+) -> UnderlyingFetcher:
     api_key = get_databento_api_key()
-    client: UnderlyingLiveClient = DatabentoLiveClient(api_key=api_key)
+    builder = client_builder or build_databento_live_client
+    client = builder(api_key)
 
     def _live_underlying_fetcher(symbol: str) -> dict[str, object]:
         return client.get_underlying_snapshot(symbol)
@@ -38,10 +48,12 @@ def _build_live_underlying_fetcher() -> Callable[[str], dict[str, object]]:
     return _live_underlying_fetcher
 
 
-def build_underlying_fetcher() -> Callable[[str], dict[str, object]]:
+def build_underlying_fetcher(
+    client_builder: LiveClientBuilder | None = None,
+) -> UnderlyingFetcher:
     runtime_mode = get_runtime_mode()
 
     if runtime_mode == "live":
-        return _build_live_underlying_fetcher()
+        return _build_live_underlying_fetcher(client_builder=client_builder)
 
     return _mock_underlying_fetcher
