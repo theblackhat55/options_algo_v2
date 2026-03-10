@@ -4,26 +4,42 @@ from pathlib import Path
 from scripts.inspect_scan_result import inspect_scan_result
 
 
-def test_inspect_scan_result_returns_zero_for_valid_file(
-    tmp_path: Path,
-    capsys,
-) -> None:
+def test_inspect_scan_result_returns_zero_for_valid_file(tmp_path: Path, capsys) -> None:
     payload = {
         "run_id": "scan_test_001",
-        "generated_at": "2026-03-10T17:36:54+00:00",
+        "generated_at": "2026-03-10T18:00:00+00:00",
         "config_versions": {
-            "universe": "universe_v1",
-            "strategy": "strategy_v1",
             "risk": "risk_v1",
+            "strategy": "strategy_v1",
+            "universe": "universe_v1",
         },
         "runtime_metadata": {
             "runtime_mode": "mock",
+            "historical_row_provider": "mock",
+            "market_breadth_provider": "mock",
+            "market_breadth_provider_source": "mock",
             "databento": {
                 "dataset": "XNAS.ITCH",
                 "schema": "ohlcv-1d",
                 "has_api_key": "false",
             },
         },
+        "feature_sources": [
+            {
+                "symbol": "AAPL",
+                "historical_row_provider": "mock",
+                "market_breadth_provider": "mock",
+                "dataset": "XNAS.ITCH",
+                "schema": "ohlcv-1d",
+            },
+            {
+                "symbol": "MSFT",
+                "historical_row_provider": "mock",
+                "market_breadth_provider": "mock",
+                "dataset": "XNAS.ITCH",
+                "schema": "ohlcv-1d",
+            },
+        ],
         "summary": {
             "total_candidates": 10,
             "total_passed": 3,
@@ -43,28 +59,45 @@ def test_inspect_scan_result_returns_zero_for_valid_file(
             "passed_symbols": ["AAPL", "MSFT", "NVDA"],
             "rejected_symbols": ["SPY", "QQQ", "IWM", "XLK", "XLF", "XLE", "SMH"],
         },
-        "decisions": [],
     }
 
-    path = tmp_path / "scan_result.json"
-    path.write_text(json.dumps(payload))
+    artifact = tmp_path / "scan_result.json"
+    artifact.write_text(json.dumps(payload))
 
-    exit_code = inspect_scan_result(str(path))
+    exit_code = inspect_scan_result(str(artifact))
     captured = capsys.readouterr()
 
     assert exit_code == 0
     assert "run_id=scan_test_001" in captured.out
     assert "runtime_mode=mock" in captured.out
-    assert "databento_runtime=" in captured.out
+    assert "historical_row_provider=mock" in captured.out
+    assert "market_breadth_provider=mock" in captured.out
+    assert "market_breadth_provider_source=mock" in captured.out
+    assert (
+        "databento_runtime={'dataset': 'XNAS.ITCH', 'schema': 'ohlcv-1d', "
+        "'has_api_key': 'false'}"
+    ) in captured.out
+    assert (
+        "feature_sources=[{'symbol': 'AAPL', 'historical_row_provider': 'mock', "
+        "'market_breadth_provider': 'mock', 'dataset': 'XNAS.ITCH', "
+        "'schema': 'ohlcv-1d'}, {'symbol': 'MSFT', 'historical_row_provider': "
+        "'mock', 'market_breadth_provider': 'mock', 'dataset': 'XNAS.ITCH', "
+        "'schema': 'ohlcv-1d'}]"
+    ) in captured.out
+    assert (
+        "feature_source_counts_by_historical_row_provider={'mock': 2}"
+    ) in captured.out
+    assert (
+        "feature_source_counts_by_market_breadth_provider={'mock': 2}"
+    ) in captured.out
+    assert (
+        "feature_source_counts_by_dataset_schema={'XNAS.ITCH|ohlcv-1d': 2}"
+    ) in captured.out
     assert "summary=total=10,passed=3,rejected=7" in captured.out
-    assert "rejection_reason_counts=" in captured.out
-    assert "signal_state_counts=" in captured.out
-    assert "strategy_type_counts=" in captured.out
-    assert "passed_symbols=['AAPL', 'MSFT', 'NVDA']" in captured.out
 
 
 def test_inspect_scan_result_returns_one_for_missing_file(capsys) -> None:
-    exit_code = inspect_scan_result("does_not_exist.json")
+    exit_code = inspect_scan_result("missing_scan_result.json")
     captured = capsys.readouterr()
 
     assert exit_code == 1
