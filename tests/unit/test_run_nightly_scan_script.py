@@ -29,6 +29,7 @@ def test_run_nightly_scan_returns_json_path(
     }
     assert payload["runtime_metadata"]["historical_row_provider"] == "mock"
     assert payload["runtime_metadata"]["market_breadth_provider"] == "mock"
+    assert payload["runtime_metadata"]["market_breadth_provider_source"] == "mock"
     assert "rejection_reason_counts" in payload["summary"]
     assert "signal_state_counts" in payload["summary"]
     assert "strategy_type_counts" in payload["summary"]
@@ -53,7 +54,7 @@ def test_run_nightly_scan_live_mode_with_key_requires_live_dependencies(
     with pytest.raises(
         (RuntimeError, NotImplementedError),
         match=(
-            "live market breadth provider is not implemented|"
+            "live market breadth client is not implemented|"
             "databento package is not installed"
         ),
     ):
