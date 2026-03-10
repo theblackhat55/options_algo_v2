@@ -455,3 +455,52 @@ def test_databento_sdk_wrapper_raises_when_volume_negative(
             dataset="XNAS.ITCH",
             schema="ohlcv-1d",
         )
+
+
+def test_databento_sdk_wrapper_get_bar_rows_returns_response_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeResponse:
+        def to_list(self) -> list[dict[str, object]]:
+            return [
+                {
+                    "ts_event": "2026-03-10T21:00:00Z",
+                    "open": 100.0,
+                    "high": 102.0,
+                    "low": 99.0,
+                    "close": 101.0,
+                    "volume": 1_000_000,
+                }
+            ]
+
+    class FakeTimeseries:
+        def get_range(self, **kwargs: object) -> FakeResponse:
+            return FakeResponse()
+
+    class FakeHistorical:
+        def __init__(self, api_key: str) -> None:
+            self.timeseries = FakeTimeseries()
+
+    import sys
+    from types import SimpleNamespace
+
+    fake_module = SimpleNamespace(Historical=FakeHistorical)
+    monkeypatch.setitem(sys.modules, "databento", fake_module)
+
+    wrapper = DatabentoHistoricalClientWrapper(api_key="test-key")
+    rows = wrapper.get_bar_rows(
+        symbol="AAPL",
+        dataset="XNAS.ITCH",
+        schema="ohlcv-1d",
+    )
+
+    assert rows == [
+        {
+            "ts_event": "2026-03-10T21:00:00Z",
+            "open": 100.0,
+            "high": 102.0,
+            "low": 99.0,
+            "close": 101.0,
+            "volume": 1_000_000,
+        }
+    ]

@@ -111,13 +111,13 @@ class DatabentoHistoricalClientWrapper:
         databento = _load_databento_module()
         return databento.Historical(api_key=self.api_key)
 
-    def get_underlying_snapshot(
+    def get_bar_rows(
         self,
         *,
         symbol: str,
         dataset: str,
         schema: str,
-    ) -> dict[str, object]:
+    ) -> list[dict[str, object]]:
         client = self.build_client()
         response = client.timeseries.get_range(
             **_build_get_range_kwargs(
@@ -126,7 +126,20 @@ class DatabentoHistoricalClientWrapper:
                 schema=schema,
             )
         )
-        rows = response.to_list()
+        return response.to_list()
+
+    def get_underlying_snapshot(
+        self,
+        *,
+        symbol: str,
+        dataset: str,
+        schema: str,
+    ) -> dict[str, object]:
+        rows = self.get_bar_rows(
+            symbol=symbol,
+            dataset=dataset,
+            schema=schema,
+        )
 
         if not rows:
             raise ValueError(f"no databento rows returned for symbol={symbol}")
