@@ -27,6 +27,8 @@ def test_run_nightly_scan_returns_json_path(
         "schema": "ohlcv-1d",
         "has_api_key": "false",
     }
+    assert payload["runtime_metadata"]["historical_row_provider"] == "mock"
+    assert payload["runtime_metadata"]["market_breadth_provider"] == "mock"
     assert "rejection_reason_counts" in payload["summary"]
     assert "signal_state_counts" in payload["summary"]
     assert "strategy_type_counts" in payload["summary"]
