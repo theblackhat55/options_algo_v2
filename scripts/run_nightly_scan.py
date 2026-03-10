@@ -29,7 +29,7 @@ def run_nightly_scan() -> str:
             symbol=symbol,
             dataset="XNAS.ITCH",
             schema="ohlcv-1d",
-            client_wrapper=row_provider,  # type: ignore[arg-type]
+            provider=row_provider,
             adx14=22.0 if is_bullish else 10.0,
             iv_rank=70.0 if is_bullish else 45.0,
             iv_hv_ratio=1.30 if is_bullish else 1.10,
