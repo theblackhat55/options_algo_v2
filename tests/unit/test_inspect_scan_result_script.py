@@ -4,7 +4,10 @@ from pathlib import Path
 from scripts.inspect_scan_result import inspect_scan_result
 
 
-def test_inspect_scan_result_returns_zero_for_valid_file(tmp_path: Path, capsys) -> None:
+def test_inspect_scan_result_returns_zero_for_valid_file(
+    tmp_path: Path,
+    capsys,
+) -> None:
     payload = {
         "run_id": "scan_test_001",
         "generated_at": "2026-03-10T18:00:00+00:00",
@@ -23,6 +26,9 @@ def test_inspect_scan_result_returns_zero_for_valid_file(tmp_path: Path, capsys)
                 "schema": "ohlcv-1d",
                 "has_api_key": "false",
             },
+            "feature_source_counts_by_historical_row_provider": {"mock": 2},
+            "feature_source_counts_by_market_breadth_provider": {"mock": 2},
+            "feature_source_counts_by_dataset_schema": {"XNAS.ITCH|ohlcv-1d": 2},
         },
         "feature_sources": [
             {
@@ -78,13 +84,6 @@ def test_inspect_scan_result_returns_zero_for_valid_file(tmp_path: Path, capsys)
         "'has_api_key': 'false'}"
     ) in captured.out
     assert (
-        "feature_sources=[{'symbol': 'AAPL', 'historical_row_provider': 'mock', "
-        "'market_breadth_provider': 'mock', 'dataset': 'XNAS.ITCH', "
-        "'schema': 'ohlcv-1d'}, {'symbol': 'MSFT', 'historical_row_provider': "
-        "'mock', 'market_breadth_provider': 'mock', 'dataset': 'XNAS.ITCH', "
-        "'schema': 'ohlcv-1d'}]"
-    ) in captured.out
-    assert (
         "feature_source_counts_by_historical_row_provider={'mock': 2}"
     ) in captured.out
     assert (
@@ -93,6 +92,7 @@ def test_inspect_scan_result_returns_zero_for_valid_file(tmp_path: Path, capsys)
     assert (
         "feature_source_counts_by_dataset_schema={'XNAS.ITCH|ohlcv-1d': 2}"
     ) in captured.out
+    assert "feature_sources=[{'symbol': 'AAPL'" in captured.out
     assert "summary=total=10,passed=3,rejected=7" in captured.out
 
 

@@ -14,6 +14,11 @@ from options_algo_v2.services.decision_diagnostics import (
     count_strategy_types,
 )
 from options_algo_v2.services.decision_serializer import serialize_candidate_decision
+from options_algo_v2.services.feature_source_diagnostics import (
+    count_feature_sources_by_dataset_schema,
+    count_feature_sources_by_historical_row_provider,
+    count_feature_sources_by_market_breadth_provider,
+)
 from options_algo_v2.services.feature_source_metadata_builder import (
     build_feature_source_metadata,
 )
@@ -81,6 +86,15 @@ def build_scan_result(
         "historical_row_provider": get_historical_row_provider_name(),
         "market_breadth_provider": get_market_breadth_provider_name(),
         "market_breadth_provider_source": get_market_breadth_provider_source(),
+        "feature_source_counts_by_historical_row_provider": (
+            count_feature_sources_by_historical_row_provider(feature_sources)
+        ),
+        "feature_source_counts_by_market_breadth_provider": (
+            count_feature_sources_by_market_breadth_provider(feature_sources)
+        ),
+        "feature_source_counts_by_dataset_schema": (
+            count_feature_sources_by_dataset_schema(feature_sources)
+        ),
     }
 
     return ScanResult(

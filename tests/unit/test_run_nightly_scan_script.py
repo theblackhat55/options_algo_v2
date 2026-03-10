@@ -31,6 +31,15 @@ def test_run_nightly_scan_returns_json_path(
     assert payload["runtime_metadata"]["historical_row_provider"] == "mock"
     assert payload["runtime_metadata"]["market_breadth_provider"] == "mock"
     assert payload["runtime_metadata"]["market_breadth_provider_source"] == "mock"
+    assert payload["runtime_metadata"][
+        "feature_source_counts_by_historical_row_provider"
+    ] == {"mock": 10}
+    assert payload["runtime_metadata"][
+        "feature_source_counts_by_market_breadth_provider"
+    ] == {"mock": 10}
+    assert payload["runtime_metadata"][
+        "feature_source_counts_by_dataset_schema"
+    ] == {"XNAS.ITCH|ohlcv-1d": 10}
     assert len(payload["feature_sources"]) == 10
     assert payload["feature_sources"][0]["historical_row_provider"] == "mock"
     assert payload["feature_sources"][0]["market_breadth_provider"] == "mock"

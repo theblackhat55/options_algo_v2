@@ -4,12 +4,6 @@ import json
 import sys
 from pathlib import Path
 
-from options_algo_v2.services.feature_source_diagnostics import (
-    count_feature_sources_by_dataset_schema,
-    count_feature_sources_by_historical_row_provider,
-    count_feature_sources_by_market_breadth_provider,
-)
-
 
 def inspect_scan_result(path_str: str) -> int:
     path = Path(path_str)
@@ -38,21 +32,21 @@ def inspect_scan_result(path_str: str) -> int:
         f"{runtime_metadata.get('market_breadth_provider_source', 'unknown')}"
     )
     print(f"databento_runtime={runtime_metadata.get('databento', {})}")
-
-    feature_sources = payload.get("feature_sources", [])
-    print(f"feature_sources={feature_sources}")
     print(
         "feature_source_counts_by_historical_row_provider="
-        f"{count_feature_sources_by_historical_row_provider(feature_sources)}"
+        f"{runtime_metadata.get('feature_source_counts_by_historical_row_provider', {})}"
     )
     print(
         "feature_source_counts_by_market_breadth_provider="
-        f"{count_feature_sources_by_market_breadth_provider(feature_sources)}"
+        f"{runtime_metadata.get('feature_source_counts_by_market_breadth_provider', {})}"
     )
     print(
         "feature_source_counts_by_dataset_schema="
-        f"{count_feature_sources_by_dataset_schema(feature_sources)}"
+        f"{runtime_metadata.get('feature_source_counts_by_dataset_schema', {})}"
     )
+
+    feature_sources = payload.get("feature_sources", [])
+    print(f"feature_sources={feature_sources}")
 
     summary = payload.get("summary", {})
     print(
