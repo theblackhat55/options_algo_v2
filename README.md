@@ -1,7 +1,3 @@
-Use this to create a repo-level `README.md` suitable for GitHub:
-
-```bash
-cat > README.md <<'MD'
 # options_algo_v2
 
 A watchlist-driven options strategy platform for scanning underlyings, evaluating market/technical/volatility context, selecting spread candidates, and producing explainable trade ideas.
