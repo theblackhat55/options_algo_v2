@@ -241,6 +241,28 @@ def _select_reference_quote(
     return candidates[0]
 
 
+def _serialize_reference_quote(quote: OptionQuote | None) -> dict[str, object] | None:
+    if quote is None:
+        return None
+    return {
+        "option_symbol": quote.option_symbol,
+        "expiration": quote.expiration,
+        "strike": float(quote.strike),
+        "option_type": quote.option_type,
+        "bid": float(quote.bid),
+        "ask": float(quote.ask),
+        "mid": float(quote.mid),
+        "delta": None if quote.delta is None else float(quote.delta),
+        "implied_volatility": (
+            None
+            if quote.implied_volatility is None
+            else float(quote.implied_volatility)
+        ),
+        "open_interest": int(quote.open_interest),
+        "volume": int(quote.volume),
+    }
+
+
 def _compute_live_iv_metrics(
     *,
     symbol: str,
@@ -328,6 +350,50 @@ def _build_live_liquidity_inputs(
         "option_quote_age_seconds": 10,
         "underlying_quote_age_seconds": 2,
     }, False
+
+
+def _build_liquidity_debug_info(
+    *,
+    symbol: str,
+    bar_rows: list[dict[str, object]],
+    snapshot: OptionsChainSnapshot | None,
+) -> dict[str, object]:
+    latest_close = _get_latest_close(bar_rows)
+    avg_daily_volume = _average_daily_volume_from_bar_rows(bar_rows)
+    reference_quote = None
+    if latest_close is not None and latest_close > 0 and snapshot is not None:
+        reference_quote = _select_reference_quote(
+            snapshot=snapshot,
+            underlying_price=latest_close,
+        )
+
+    liquidity_inputs, used_placeholder_liquidity_inputs = _build_live_liquidity_inputs(
+        symbol=symbol,
+        bar_rows=bar_rows,
+        snapshot=snapshot,
+    )
+
+    return {
+        "symbol": symbol,
+        "latest_close": latest_close,
+        "avg_daily_volume_from_bars": avg_daily_volume,
+        "snapshot_source": None if snapshot is None else snapshot.source,
+        "snapshot_as_of": None if snapshot is None else snapshot.as_of,
+        "quote_count": 0 if snapshot is None else len(snapshot.quotes),
+        "used_placeholder_liquidity_inputs": used_placeholder_liquidity_inputs,
+        "selected_reference_quote": _serialize_reference_quote(reference_quote),
+        "selected_liquidity_inputs": {
+            "avg_daily_volume": float(liquidity_inputs["avg_daily_volume"]),
+            "option_open_interest": int(liquidity_inputs["option_open_interest"]),
+            "option_volume": int(liquidity_inputs["option_volume"]),
+            "bid": float(liquidity_inputs["bid"]),
+            "ask": float(liquidity_inputs["ask"]),
+            "option_quote_age_seconds": int(liquidity_inputs["option_quote_age_seconds"]),
+            "underlying_quote_age_seconds": int(
+                liquidity_inputs["underlying_quote_age_seconds"]
+            ),
+        },
+    }
 
 
 def _build_raw_feature_with_fallback(
@@ -518,6 +584,7 @@ def run_nightly_scan(
     placeholder_liquidity_symbols: list[str] = []
     iv_rank_ready_symbols: list[str] = []
     quote_quality_by_symbol: dict[str, dict[str, int]] = {}
+    liquidity_debug_by_symbol: dict[str, dict[str, object]] = {}
     aggregate_quote_quality_counts: dict[str, int] = {
         "total_quotes": 0,
         "real_quotes": 0,
@@ -555,6 +622,17 @@ def run_nightly_scan(
         aggregate_quote_quality_counts = _merge_quote_quality_counts(
             aggregate_quote_quality_counts,
             symbol_quote_quality_counts,
+        )
+        bar_rows_for_debug = _get_bar_rows(
+            row_provider=row_provider,
+            symbol=symbol,
+            dataset="XNAS.ITCH",
+            schema="ohlcv-1d",
+        )
+        liquidity_debug_by_symbol[symbol] = _build_liquidity_debug_info(
+            symbol=symbol,
+            bar_rows=bar_rows_for_debug,
+            snapshot=snapshot_for_quality,
         )
 
         if used_placeholder_iv_rank:
@@ -625,6 +703,7 @@ def run_nightly_scan(
             },
             "quote_quality_by_symbol": quote_quality_by_symbol,
             "aggregate_quote_quality_counts": aggregate_quote_quality_counts,
+            "liquidity_debug_by_symbol": liquidity_debug_by_symbol,
             "degraded_live_mode": degraded_live_mode,
         },
     )
@@ -635,14 +714,16 @@ def run_nightly_scan(
     summary = payload["summary"]
     runtime_metadata = payload["runtime_metadata"]
 
-    print(f"runtime_mode={runtime_mode}")
+    resolved_runtime_mode = str(runtime_metadata.get("runtime_mode", runtime_mode))
+
+    print(f"runtime_mode={resolved_runtime_mode}")
     print(f"symbols={selected_symbols}")
     print(f"as_of_date={execution_settings.as_of_date.isoformat()}")
     print(f"strict_live_mode={execution_settings.strict_live_mode}")
     print(f"run_id={payload['run_id']}")
     print(f"output_path={output_path}")
 
-    if runtime_mode == "live":
+    if resolved_runtime_mode == "live":
         if degraded_live_mode:
             print("WARNING: degraded_live_mode=true")
         if used_mock_historical_fallback:
@@ -678,6 +759,13 @@ def run_nightly_scan(
             "aggregate_quote_quality_counts="
             f"{runtime_metadata.get('aggregate_quote_quality_counts', {})}"
         )
+        liquidity_debug_by_symbol = runtime_metadata.get("liquidity_debug_by_symbol", {})
+        if liquidity_debug_by_symbol:
+            first_symbol = sorted(liquidity_debug_by_symbol.keys())[0]
+            print(
+                "sample_liquidity_debug="
+                f"{first_symbol}:{liquidity_debug_by_symbol[first_symbol]}"
+            )
 
     print(
         "summary="
