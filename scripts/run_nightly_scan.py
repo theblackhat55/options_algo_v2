@@ -123,6 +123,64 @@ def _get_options_snapshot(
     return snapshot
 
 
+def _build_quote_quality_counts(
+    snapshot: OptionsChainSnapshot | None,
+) -> dict[str, int]:
+    quotes = list(snapshot.quotes) if snapshot is not None else []
+
+    counts = {
+        "total_quotes": 0,
+        "real_quotes": 0,
+        "synthetic_quotes": 0,
+        "missing_iv_quotes": 0,
+        "missing_delta_quotes": 0,
+        "zero_open_interest_quotes": 0,
+        "zero_volume_quotes": 0,
+        "wide_spread_quotes": 0,
+    }
+
+    for quote in quotes:
+        bid = float(quote.bid or 0.0)
+        ask = float(quote.ask or 0.0)
+        mid = float(quote.mid or 0.0)
+        implied_volatility = quote.implied_volatility
+        delta = quote.delta
+        open_interest = int(quote.open_interest or 0)
+        volume = int(quote.volume or 0)
+
+        counts["total_quotes"] += 1
+
+        has_real_two_sided_quote = bid > 0.0 and ask > 0.0 and ask >= bid
+        if has_real_two_sided_quote:
+            counts["real_quotes"] += 1
+            spread_pct = ((ask - bid) / mid) if mid > 0.0 else 0.0
+            if spread_pct > 0.10:
+                counts["wide_spread_quotes"] += 1
+        else:
+            counts["synthetic_quotes"] += 1
+
+        if implied_volatility is None:
+            counts["missing_iv_quotes"] += 1
+        if delta is None:
+            counts["missing_delta_quotes"] += 1
+        if open_interest <= 0:
+            counts["zero_open_interest_quotes"] += 1
+        if volume <= 0:
+            counts["zero_volume_quotes"] += 1
+
+    return counts
+
+
+def _merge_quote_quality_counts(
+    aggregate: dict[str, int],
+    symbol_counts: dict[str, int],
+) -> dict[str, int]:
+    merged = dict(aggregate)
+    for key, value in symbol_counts.items():
+        merged[key] = int(merged.get(key, 0)) + int(value)
+    return merged
+
+
 def _get_latest_close(bar_rows: list[dict[str, object]]) -> float | None:
     if not bar_rows:
         return None
@@ -269,7 +327,7 @@ def _build_live_liquidity_inputs(
         "ask": float(reference_quote.ask),
         "option_quote_age_seconds": 10,
         "underlying_quote_age_seconds": 2,
-    }, True
+    }, False
 
 
 def _build_raw_feature_with_fallback(
@@ -459,6 +517,17 @@ def run_nightly_scan(
     placeholder_iv_hv_ratio_symbols: list[str] = []
     placeholder_liquidity_symbols: list[str] = []
     iv_rank_ready_symbols: list[str] = []
+    quote_quality_by_symbol: dict[str, dict[str, int]] = {}
+    aggregate_quote_quality_counts: dict[str, int] = {
+        "total_quotes": 0,
+        "real_quotes": 0,
+        "synthetic_quotes": 0,
+        "missing_iv_quotes": 0,
+        "missing_delta_quotes": 0,
+        "zero_open_interest_quotes": 0,
+        "zero_volume_quotes": 0,
+        "wide_spread_quotes": 0,
+    }
 
     for symbol in selected_symbols:
         (
@@ -476,6 +545,18 @@ def run_nightly_scan(
             as_of_date=execution_settings.as_of_date,
         )
         historical_provider_modes[symbol] = provider_mode
+
+        snapshot_for_quality = _get_options_snapshot(
+            options_chain_provider=options_chain_provider,
+            symbol=symbol,
+        )
+        symbol_quote_quality_counts = _build_quote_quality_counts(snapshot_for_quality)
+        quote_quality_by_symbol[symbol] = symbol_quote_quality_counts
+        aggregate_quote_quality_counts = _merge_quote_quality_counts(
+            aggregate_quote_quality_counts,
+            symbol_quote_quality_counts,
+        )
+
         if used_placeholder_iv_rank:
             placeholder_iv_rank_symbols.append(symbol)
         else:
@@ -542,6 +623,8 @@ def run_nightly_scan(
                 symbol: count_iv_proxy_observations(path=history_path, symbol=symbol)
                 for symbol in selected_symbols
             },
+            "quote_quality_by_symbol": quote_quality_by_symbol,
+            "aggregate_quote_quality_counts": aggregate_quote_quality_counts,
             "degraded_live_mode": degraded_live_mode,
         },
     )
@@ -559,34 +642,41 @@ def run_nightly_scan(
     print(f"run_id={payload['run_id']}")
     print(f"output_path={output_path}")
 
-    if degraded_live_mode:
-        print("WARNING: degraded_live_mode=true")
-    if used_mock_historical_fallback:
-        print("WARNING: mock historical fallback was used")
-    if breadth_override_symbols:
-        print(f"WARNING: breadth override used for symbols={breadth_override_symbols}")
-    if placeholder_iv_rank_symbols:
+    if runtime_mode == "live":
+        if degraded_live_mode:
+            print("WARNING: degraded_live_mode=true")
+        if used_mock_historical_fallback:
+            print("WARNING: mock historical fallback was used")
+        if breadth_override_symbols:
+            print(
+                f"WARNING: breadth override used for symbols={breadth_override_symbols}"
+            )
+        if placeholder_iv_rank_symbols:
+            print(
+                "WARNING: placeholder IV rank inputs used for symbols="
+                f"{placeholder_iv_rank_symbols}"
+            )
+        print(f"iv_rank_ready_symbols={iv_rank_ready_symbols}")
+        print(f"iv_rank_insufficient_history_symbols={placeholder_iv_rank_symbols}")
+        print(f"iv_rank_history_path={history_path}")
+        print(f"iv_rank_trailing_observations={IV_RANK_TRAILING_OBSERVATIONS}")
         print(
-            "WARNING: placeholder IV rank inputs used for symbols="
-            f"{placeholder_iv_rank_symbols}"
+            "iv_rank_observation_count_by_symbol="
+            f"{runtime_metadata.get('iv_rank_observation_count_by_symbol', {})}"
         )
-    print(f"iv_rank_ready_symbols={iv_rank_ready_symbols}")
-    print(f"iv_rank_insufficient_history_symbols={placeholder_iv_rank_symbols}")
-    print(f"iv_rank_history_path={history_path}")
-    print(f"iv_rank_trailing_observations={IV_RANK_TRAILING_OBSERVATIONS}")
-    print(
-        "iv_rank_observation_count_by_symbol="
-        f"{runtime_metadata.get('iv_rank_observation_count_by_symbol', {})}"
-    )
-    if placeholder_iv_hv_ratio_symbols:
+        if placeholder_iv_hv_ratio_symbols:
+            print(
+                "WARNING: placeholder IV/HV ratio inputs used for symbols="
+                f"{placeholder_iv_hv_ratio_symbols}"
+            )
+        if placeholder_liquidity_symbols:
+            print(
+                "WARNING: placeholder liquidity inputs used for symbols="
+                f"{placeholder_liquidity_symbols}"
+            )
         print(
-            "WARNING: placeholder IV/HV ratio inputs used for symbols="
-            f"{placeholder_iv_hv_ratio_symbols}"
-        )
-    if placeholder_liquidity_symbols:
-        print(
-            "WARNING: placeholder liquidity inputs used for symbols="
-            f"{placeholder_liquidity_symbols}"
+            "aggregate_quote_quality_counts="
+            f"{runtime_metadata.get('aggregate_quote_quality_counts', {})}"
         )
 
     print(
