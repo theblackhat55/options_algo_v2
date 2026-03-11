@@ -12,6 +12,13 @@ from options_algo_v2.services.historical_row_provider_factory import (
 )
 from options_algo_v2.services.iv_feature_estimator import (
     compute_iv_hv_ratio_from_snapshot_and_bars,
+    estimate_near_atm_implied_vol,
+)
+from options_algo_v2.services.iv_rank_history import (
+    IvProxyObservation,
+    append_iv_proxy_observation,
+    compute_iv_rank_from_history,
+    default_iv_rank_history_path,
 )
 from options_algo_v2.services.live_raw_feature_pipeline import (
     build_live_raw_feature_input,
@@ -76,6 +83,37 @@ def _get_market_breadth_pct(symbol: str, breadth_provider: object) -> tuple[floa
     return float(getter(symbol=symbol)), False
 
 
+def _get_bar_rows(
+    *,
+    row_provider: object,
+    symbol: str,
+    dataset: str,
+    schema: str,
+) -> list[dict[str, object]]:
+    get_rows = getattr(row_provider, "get_bar_rows", None)
+    if get_rows is None:
+        return []
+    rows = get_rows(
+        symbol=symbol,
+        dataset=dataset,
+        schema=schema,
+    )
+    if not isinstance(rows, list):
+        return []
+    return rows
+
+
+def _get_options_snapshot(
+    *,
+    options_chain_provider: object,
+    symbol: str,
+) -> object | None:
+    get_chain = getattr(options_chain_provider, "get_chain", None)
+    if get_chain is None:
+        return None
+    return get_chain(symbol)
+
+
 def _get_latest_close(bar_rows: list[dict[str, object]]) -> float | None:
     if not bar_rows:
         return None
@@ -87,38 +125,65 @@ def _get_latest_close(bar_rows: list[dict[str, object]]) -> float | None:
     return None
 
 
-def _compute_live_iv_hv_ratio(
+def _compute_live_iv_metrics(
     *,
     symbol: str,
     row_provider: object,
     options_chain_provider: object,
     dataset: str,
     schema: str,
-) -> float | None:
-    get_rows = getattr(row_provider, "get_bar_rows", None)
-    get_chain = getattr(options_chain_provider, "get_chain", None)
-
-    if get_rows is None or get_chain is None:
-        return None
-
-    bar_rows = get_rows(
+    as_of_date: date,
+) -> tuple[float | None, float | None]:
+    bar_rows = _get_bar_rows(
+        row_provider=row_provider,
         symbol=symbol,
         dataset=dataset,
         schema=schema,
     )
-    if not isinstance(bar_rows, list) or not bar_rows:
-        return None
+    if not bar_rows:
+        return None, None
 
     latest_close = _get_latest_close(bar_rows)
     if latest_close is None or latest_close <= 0:
-        return None
+        return None, None
 
-    snapshot = get_chain(symbol)
-    return compute_iv_hv_ratio_from_snapshot_and_bars(
+    snapshot = _get_options_snapshot(
+        options_chain_provider=options_chain_provider,
+        symbol=symbol,
+    )
+    if snapshot is None:
+        return None, None
+
+    implied_vol_proxy = estimate_near_atm_implied_vol(
+        snapshot=snapshot,
+        underlying_price=latest_close,
+    )
+
+    iv_hv_ratio = compute_iv_hv_ratio_from_snapshot_and_bars(
         snapshot=snapshot,
         bar_rows=bar_rows,
         underlying_price=latest_close,
     )
+
+    if implied_vol_proxy is not None:
+        history_path = default_iv_rank_history_path()
+        append_iv_proxy_observation(
+            path=history_path,
+            observation=IvProxyObservation(
+                as_of_date=as_of_date.isoformat(),
+                symbol=symbol,
+                implied_vol_proxy=implied_vol_proxy,
+            ),
+        )
+        iv_rank = compute_iv_rank_from_history(
+            path=history_path,
+            symbol=symbol,
+            trailing_observations=20,
+        )
+    else:
+        iv_rank = None
+
+    return iv_rank, iv_hv_ratio
 
 
 def _build_raw_feature_with_fallback(
@@ -128,7 +193,7 @@ def _build_raw_feature_with_fallback(
     breadth_provider: object,
     options_chain_provider: object,
     as_of_date: date,
-) -> tuple[object, str, bool, bool]:
+) -> tuple[object, str, bool, bool, bool]:
     settings = get_runtime_execution_settings()
 
     is_bullish = symbol in {"AAPL", "MSFT", "NVDA", "SPY", "QQQ"}
@@ -140,20 +205,23 @@ def _build_raw_feature_with_fallback(
     dataset = "XNAS.ITCH"
     schema = "ohlcv-1d"
 
-    real_iv_hv_ratio = _compute_live_iv_hv_ratio(
+    real_iv_rank, real_iv_hv_ratio = _compute_live_iv_metrics(
         symbol=symbol,
         row_provider=row_provider,
         options_chain_provider=options_chain_provider,
         dataset=dataset,
         schema=schema,
+        as_of_date=as_of_date,
     )
+
+    used_placeholder_iv_rank = real_iv_rank is None
     used_placeholder_iv_hv_ratio = real_iv_hv_ratio is None
 
     common_kwargs = {
         "symbol": symbol,
         "dataset": dataset,
         "schema": schema,
-        "iv_rank": 70.0 if is_bullish else 45.0,
+        "iv_rank": real_iv_rank if real_iv_rank is not None else (70.0 if is_bullish else 45.0),
         "iv_hv_ratio": (
             real_iv_hv_ratio
             if real_iv_hv_ratio is not None
@@ -177,7 +245,13 @@ def _build_raw_feature_with_fallback(
             provider=row_provider,
             **common_kwargs,
         )
-        return raw, "primary", used_breadth_override, used_placeholder_iv_hv_ratio
+        return (
+            raw,
+            "primary",
+            used_breadth_override,
+            used_placeholder_iv_rank,
+            used_placeholder_iv_hv_ratio,
+        )
     except ValueError as exc:
         if "no rows provided to build bar history" not in str(exc):
             raise
@@ -192,7 +266,13 @@ def _build_raw_feature_with_fallback(
         provider=fallback_provider,
         **common_kwargs,
     )
-    return raw, "mock_historical_fallback", used_breadth_override, used_placeholder_iv_hv_ratio
+    return (
+        raw,
+        "mock_historical_fallback",
+        used_breadth_override,
+        used_placeholder_iv_rank,
+        used_placeholder_iv_hv_ratio,
+    )
 
 
 def run_nightly_scan(
@@ -220,17 +300,22 @@ def run_nightly_scan(
     placeholder_iv_hv_ratio_symbols: list[str] = []
 
     for symbol in selected_symbols:
-        raw, provider_mode, used_breadth_override, used_placeholder_iv_hv_ratio = (
-            _build_raw_feature_with_fallback(
-                symbol=symbol,
-                row_provider=row_provider,
-                breadth_provider=breadth_provider,
-                options_chain_provider=options_chain_provider,
-                as_of_date=execution_settings.as_of_date,
-            )
+        (
+            raw,
+            provider_mode,
+            used_breadth_override,
+            used_placeholder_iv_rank,
+            used_placeholder_iv_hv_ratio,
+        ) = _build_raw_feature_with_fallback(
+            symbol=symbol,
+            row_provider=row_provider,
+            breadth_provider=breadth_provider,
+            options_chain_provider=options_chain_provider,
+            as_of_date=execution_settings.as_of_date,
         )
         historical_provider_modes[symbol] = provider_mode
-        placeholder_iv_rank_symbols.append(symbol)
+        if used_placeholder_iv_rank:
+            placeholder_iv_rank_symbols.append(symbol)
         if used_placeholder_iv_hv_ratio:
             placeholder_iv_hv_ratio_symbols.append(symbol)
         if used_breadth_override:
