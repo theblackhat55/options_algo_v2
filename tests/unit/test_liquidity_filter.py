@@ -47,13 +47,36 @@ def test_liquidity_filter_rejects_multiple_failures() -> None:
     assert len(result.reasons) >= 5
 
 
-def test_liquidity_filter_rejects_invalid_quote() -> None:
+def test_liquidity_filter_allows_locked_quote() -> None:
     result = passes_liquidity_filter(
         underlying_price=100.0,
         avg_daily_volume=2_000_000,
         option_open_interest=1_000,
         option_volume=200,
         bid=2.00,
+        ask=2.00,
+        option_quote_age_seconds=10,
+        underlying_quote_age_seconds=5,
+        min_underlying_price=20.0,
+        min_avg_daily_volume=1_000_000,
+        min_option_open_interest=500,
+        min_option_volume=100,
+        max_bid_ask_spread_pct=0.08,
+        max_option_quote_age_seconds=60,
+        max_underlying_quote_age_seconds=10,
+    )
+
+    assert result.passed is True
+    assert "invalid bid ask quote" not in result.reasons
+
+
+def test_liquidity_filter_rejects_inverted_quote() -> None:
+    result = passes_liquidity_filter(
+        underlying_price=100.0,
+        avg_daily_volume=2_000_000,
+        option_open_interest=1_000,
+        option_volume=200,
+        bid=2.05,
         ask=2.00,
         option_quote_age_seconds=10,
         underlying_quote_age_seconds=5,

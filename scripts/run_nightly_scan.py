@@ -786,6 +786,16 @@ def run_nightly_scan(
         "top_trade_summary_rows="
         f"{runtime_metadata.get('top_trade_summary_rows', [])}"
     )
+    spread_debug_by_symbol = runtime_metadata.get(
+        "trade_candidate_spread_debug_by_symbol",
+        {},
+    )
+    if spread_debug_by_symbol:
+        first_symbol = sorted(spread_debug_by_symbol.keys())[0]
+        print(
+            "sample_trade_candidate_spread_debug="
+            f"{first_symbol}:{spread_debug_by_symbol[first_symbol][:2]}"
+        )
 
     return str(output_path)
 

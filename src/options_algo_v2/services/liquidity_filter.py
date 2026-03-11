@@ -35,7 +35,7 @@ def passes_liquidity_filter(
     if option_volume < min_option_volume:
         reasons.append("option volume below minimum")
 
-    if bid <= 0 or ask <= 0 or ask <= bid:
+    if bid <= 0 or ask <= 0 or ask < bid:
         reasons.append("invalid bid ask quote")
     else:
         mid = (bid + ask) / 2.0
