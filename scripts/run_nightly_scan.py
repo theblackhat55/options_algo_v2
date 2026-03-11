@@ -20,6 +20,8 @@ from options_algo_v2.services.iv_rank_history import (
     compute_iv_rank_from_history,
     default_iv_rank_history_path,
 )
+
+IV_RANK_TRAILING_OBSERVATIONS = 20
 from options_algo_v2.services.live_raw_feature_pipeline import (
     build_live_raw_feature_input,
 )
@@ -178,7 +180,7 @@ def _compute_live_iv_metrics(
         iv_rank = compute_iv_rank_from_history(
             path=history_path,
             symbol=symbol,
-            trailing_observations=20,
+            trailing_observations=IV_RANK_TRAILING_OBSERVATIONS,
         )
     else:
         iv_rank = None
@@ -298,6 +300,7 @@ def run_nightly_scan(
     breadth_override_symbols: list[str] = []
     placeholder_iv_rank_symbols: list[str] = []
     placeholder_iv_hv_ratio_symbols: list[str] = []
+    iv_rank_ready_symbols: list[str] = []
 
     for symbol in selected_symbols:
         (
@@ -316,6 +319,8 @@ def run_nightly_scan(
         historical_provider_modes[symbol] = provider_mode
         if used_placeholder_iv_rank:
             placeholder_iv_rank_symbols.append(symbol)
+        else:
+            iv_rank_ready_symbols.append(symbol)
         if used_placeholder_iv_hv_ratio:
             placeholder_iv_hv_ratio_symbols.append(symbol)
         if used_breadth_override:
@@ -359,6 +364,10 @@ def run_nightly_scan(
             "used_placeholder_iv_hv_ratio_inputs": used_placeholder_iv_hv_ratio_inputs,
             "placeholder_iv_rank_symbols": placeholder_iv_rank_symbols,
             "placeholder_iv_hv_ratio_symbols": placeholder_iv_hv_ratio_symbols,
+            "iv_rank_ready_symbols": iv_rank_ready_symbols,
+            "iv_rank_insufficient_history_symbols": placeholder_iv_rank_symbols,
+            "iv_rank_history_path": str(default_iv_rank_history_path()),
+            "iv_rank_trailing_observations": IV_RANK_TRAILING_OBSERVATIONS,
             "degraded_live_mode": degraded_live_mode,
         },
     )
@@ -387,6 +396,10 @@ def run_nightly_scan(
             "WARNING: placeholder IV rank inputs used for symbols="
             f"{placeholder_iv_rank_symbols}"
         )
+    print(f"iv_rank_ready_symbols={iv_rank_ready_symbols}")
+    print(f"iv_rank_insufficient_history_symbols={placeholder_iv_rank_symbols}")
+    print(f"iv_rank_history_path={default_iv_rank_history_path()}")
+    print(f"iv_rank_trailing_observations={IV_RANK_TRAILING_OBSERVATIONS}")
     if placeholder_iv_hv_ratio_symbols:
         print(
             "WARNING: placeholder IV/HV ratio inputs used for symbols="
