@@ -105,10 +105,11 @@ def test_run_nightly_scan_live_mode_with_key_requires_live_dependencies(
     monkeypatch.setenv("DATABENTO_API_KEY", "test-key")
 
     with pytest.raises(
-        (RuntimeError, NotImplementedError),
+        (RuntimeError, NotImplementedError, ValueError),
         match=(
             "live market breadth data source is not configured|"
-            "databento package is not installed"
+            "databento package is not installed|"
+            "POLYGON_API_KEY is required for live options chain mode"
         ),
     ):
         run_nightly_scan()

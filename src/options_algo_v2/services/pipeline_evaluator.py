@@ -26,7 +26,12 @@ def payload_to_evaluation_input(
         underlying_quote_age_seconds=payload.underlying_quote_age_seconds,
         close=payload.close,
         dma20=payload.dma20,
+        dma50=payload.dma50,
         atr20=payload.atr20,
+        adx14=payload.adx14,
+        iv_rank=payload.iv_rank,
+        iv_hv_ratio=payload.iv_hv_ratio,
+        market_breadth_pct_above_20dma=payload.market_breadth_pct_above_20dma,
         expected_move_fit=payload.expected_move_fit,
     )
 

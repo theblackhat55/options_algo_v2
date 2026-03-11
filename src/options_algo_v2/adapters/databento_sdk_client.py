@@ -93,9 +93,18 @@ def _build_get_range_kwargs(
     symbol: str,
     dataset: str,
     schema: str,
+    lookback_days: int = 60,
 ) -> dict[str, object]:
-    end = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-    start = end - timedelta(days=60)
+    if lookback_days <= 0:
+        raise ValueError("lookback_days must be positive")
+
+    end = datetime.now(UTC).replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+    start = end - timedelta(days=lookback_days)
 
     return {
         "dataset": dataset,
@@ -136,7 +145,8 @@ def _normalize_response_rows(response: object) -> list[dict[str, object]]:
         to_df = response.to_df
         if callable(to_df):
             df = to_df()
-            if hasattr(df, "to_dict"):
+            if hasattr(df, "reset_index") and hasattr(df, "to_dict"):
+                df = df.reset_index()
                 records = df.to_dict("records")
                 if isinstance(records, list):
                     return [dict(item) for item in records if isinstance(item, dict)]
@@ -168,6 +178,7 @@ class DatabentoHistoricalClientWrapper:
         symbol: str,
         dataset: str,
         schema: str,
+        lookback_days: int = 60,
     ) -> list[dict[str, object]]:
         client = self.build_client()
         response = client.timeseries.get_range(
@@ -175,6 +186,7 @@ class DatabentoHistoricalClientWrapper:
                 symbol=symbol,
                 dataset=dataset,
                 schema=schema,
+                lookback_days=lookback_days,
             )
         )
         return _normalize_response_rows(response)
@@ -190,6 +202,7 @@ class DatabentoHistoricalClientWrapper:
             symbol=symbol,
             dataset=dataset,
             schema=schema,
+            lookback_days=60,
         )
 
         if not rows:

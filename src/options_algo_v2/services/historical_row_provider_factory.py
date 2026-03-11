@@ -46,7 +46,7 @@ class DatabentoHistoricalRowProvider(HistoricalRowProvider):
     ) -> list[dict[str, object]]:
         return self.client.get_daily_rows(
             symbol=symbol,
-            lookback_days=50,
+            lookback_days=90,
             dataset=dataset,
             schema=schema,
         )

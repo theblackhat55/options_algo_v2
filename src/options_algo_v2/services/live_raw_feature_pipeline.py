@@ -15,7 +15,7 @@ def build_live_raw_feature_input(
     dataset: str,
     schema: str,
     provider: HistoricalRowProvider,
-    adx14: float,
+    adx14: float | None = None,
     iv_rank: float,
     iv_hv_ratio: float,
     avg_daily_volume: float,

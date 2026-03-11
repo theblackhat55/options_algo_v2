@@ -3,6 +3,31 @@ from __future__ import annotations
 from options_algo_v2.domain.decision import CandidateDecision
 
 
+def _directional_checks(decision: CandidateDecision) -> dict[str, bool]:
+    close_gt_dma20 = False
+    if decision.close is not None and decision.dma20 is not None:
+        close_value = decision.close
+        dma20_value = decision.dma20
+        close_gt_dma20 = close_value > dma20_value
+
+    dma20_gt_dma50 = False
+    if decision.dma20 is not None and decision.dma50 is not None:
+        dma20_value = decision.dma20
+        dma50_value = decision.dma50
+        dma20_gt_dma50 = dma20_value > dma50_value
+
+    adx14_gte_18 = False
+    if decision.adx14 is not None:
+        adx14_value = decision.adx14
+        adx14_gte_18 = adx14_value >= 18.0
+
+    return {
+        "close_gt_dma20": close_gt_dma20,
+        "dma20_gt_dma50": dma20_gt_dma50,
+        "adx14_gte_18": adx14_gte_18,
+    }
+
+
 def serialize_candidate_decision(
     decision: CandidateDecision,
 ) -> dict[str, object]:
@@ -30,4 +55,13 @@ def serialize_candidate_decision(
             "passed": decision.extension_result.passed,
             "reasons": list(decision.extension_result.reasons),
         },
+        "close": decision.close,
+        "dma20": decision.dma20,
+        "dma50": decision.dma50,
+        "atr20": decision.atr20,
+        "adx14": decision.adx14,
+        "iv_rank": decision.iv_rank,
+        "iv_hv_ratio": decision.iv_hv_ratio,
+        "market_breadth_pct_above_20dma": decision.market_breadth_pct_above_20dma,
+        "directional_checks": _directional_checks(decision),
     }

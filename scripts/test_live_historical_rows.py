@@ -16,17 +16,22 @@ def main() -> None:
     settings = load_databento_settings()
     provider = build_historical_row_provider()
 
-    rows = provider.get_bar_rows(
-        symbol=symbol,
-        dataset=settings.dataset,
-        schema=settings.schema,
-    )
-
     print(f"provider={get_historical_row_provider_name()}")
     print(f"provider_source={get_historical_row_provider_source()}")
     print(f"symbol={symbol}")
     print(f"dataset={settings.dataset}")
     print(f"schema={settings.schema}")
+
+    try:
+        rows = provider.get_bar_rows(
+            symbol=symbol,
+            dataset=settings.dataset,
+            schema=settings.schema,
+        )
+    except Exception as exc:
+        print(f"error={type(exc).__name__}: {exc}")
+        raise
+
     print(f"rows={len(rows)}")
 
     if not rows:

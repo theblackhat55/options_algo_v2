@@ -26,13 +26,13 @@ def select_vertical_call_spread_candidates(
     calls = sorted(calls, key=lambda quote: quote.strike)
 
     candidates: list[VerticalSpreadCandidate] = []
-    for left, right in zip(calls, calls[1:], strict=False):
+    for lower_strike_call, higher_strike_call in zip(calls, calls[1:], strict=False):
         candidates.append(
             VerticalSpreadCandidate(
                 symbol=chain.symbol,
                 strategy_family="BULL_CALL_SPREAD",
-                short_leg=left,
-                long_leg=right,
+                short_leg=higher_strike_call,
+                long_leg=lower_strike_call,
             )
         )
     return candidates

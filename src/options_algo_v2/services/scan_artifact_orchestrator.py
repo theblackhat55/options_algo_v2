@@ -21,12 +21,14 @@ def build_and_write_scan_artifact(
     decisions: list[CandidateDecision],
     base_dir: str | Path = "data/scan_results",
     run_id: str | None = None,
+    degraded_metadata: dict[str, object] | None = None,
 ) -> ScanArtifactResult:
     resolved_run_id = run_id or generate_run_id()
 
     scan_result = build_scan_result(
         run_id=resolved_run_id,
         decisions=decisions,
+        degraded_metadata=degraded_metadata or {},
     )
 
     output_path = write_scan_result(

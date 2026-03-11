@@ -12,6 +12,12 @@ dependencies = [
   "pyyaml>=6.0"
 ]
 
+[project.optional-dependencies]
+live = [
+  "databento",
+  "python-dotenv"
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = [".", "src"]

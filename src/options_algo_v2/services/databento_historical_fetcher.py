@@ -12,10 +12,27 @@ def fetch_databento_daily_rows(
     schema: str,
     api_key: str,
 ) -> list[dict[str, object]]:
-    _ = lookback_days
     wrapper = DatabentoHistoricalClientWrapper(api_key=api_key)
-    return wrapper.get_bar_rows(
-        symbol=symbol,
-        dataset=dataset,
-        schema=schema,
-    )
+    try:
+        rows = wrapper.get_bar_rows(
+            symbol=symbol,
+            dataset=dataset,
+            schema=schema,
+            lookback_days=lookback_days,
+        )
+    except TypeError as exc:
+        if "lookback_days" not in str(exc):
+            raise
+        rows = wrapper.get_bar_rows(
+            symbol=symbol,
+            dataset=dataset,
+            schema=schema,
+        )
+
+    if not rows:
+        raise ValueError(
+            "no databento rows returned "
+            f"for symbol={symbol}, dataset={dataset}, schema={schema}"
+        )
+
+    return rows

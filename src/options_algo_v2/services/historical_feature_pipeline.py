@@ -20,7 +20,7 @@ def build_raw_feature_input_from_bar_rows(
     *,
     symbol: str,
     rows: list[dict[str, object]],
-    adx14: float,
+    adx14: float | None = None,
     iv_rank: float,
     iv_hv_ratio: float,
     avg_daily_volume: float,

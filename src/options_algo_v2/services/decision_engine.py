@@ -106,5 +106,13 @@ def evaluate_candidate_decision(
         final_passed=final_passed,
         final_score=final_score,
         min_score_required=min_score_required,
+        close=evaluation_input.close,
+        dma20=evaluation_input.dma20,
+        dma50=evaluation_input.dma50,
+        atr20=evaluation_input.atr20,
+        adx14=evaluation_input.adx14,
+        iv_rank=evaluation_input.iv_rank,
+        iv_hv_ratio=evaluation_input.iv_hv_ratio,
+        market_breadth_pct_above_20dma=evaluation_input.market_breadth_pct_above_20dma,
         rejection_reasons=rejection_reasons,
     )

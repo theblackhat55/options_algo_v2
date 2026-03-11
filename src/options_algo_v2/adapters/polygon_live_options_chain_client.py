@@ -115,8 +115,19 @@ class PolygonLiveOptionsChainClient:
 
         greeks = item.get("greeks")
         delta = 0.0
+        implied_volatility: float | None = None
         if isinstance(greeks, dict):
             delta = self._to_float(greeks.get("delta")) or 0.0
+            implied_volatility = self._normalize_implied_vol(
+                self._to_float(greeks.get("implied_volatility"))
+                or self._to_float(greeks.get("iv"))
+            )
+
+        if implied_volatility is None:
+            implied_volatility = self._normalize_implied_vol(
+                self._to_float(item.get("implied_volatility"))
+                or self._to_float(item.get("iv"))
+            )
 
         open_interest = int(self._to_float(item.get("open_interest")) or 0.0)
 
@@ -141,9 +152,19 @@ class PolygonLiveOptionsChainClient:
             ask=ask,
             mid=mid,
             delta=delta,
+            implied_volatility=implied_volatility,
             open_interest=open_interest,
             volume=volume,
         )
+
+    @staticmethod
+    def _normalize_implied_vol(value: float | None) -> float | None:
+        if value is None or value <= 0:
+            return None
+        if value > 3.0:
+            return value / 100.0
+        return value
+
 
     @staticmethod
     def _to_float(value: object) -> float | None:

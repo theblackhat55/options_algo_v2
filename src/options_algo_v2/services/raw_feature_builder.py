@@ -10,7 +10,7 @@ def build_raw_feature_input(
     *,
     symbol: str,
     computed_features: ComputedUnderlyingFeatures,
-    adx14: float,
+    adx14: float | None = None,
     iv_rank: float,
     iv_hv_ratio: float,
     avg_daily_volume: float,
@@ -25,13 +25,15 @@ def build_raw_feature_input(
     entry_date: date,
     dte_days: int,
 ) -> RawFeatureInput:
+    resolved_adx14 = computed_features.adx14 if adx14 is None else adx14
+
     return RawFeatureInput(
         symbol=symbol,
         close=computed_features.close,
         dma20=computed_features.dma20,
         dma50=computed_features.dma50,
         atr20=computed_features.atr20,
-        adx14=adx14,
+        adx14=resolved_adx14,
         iv_rank=iv_rank,
         iv_hv_ratio=iv_hv_ratio,
         avg_daily_volume=avg_daily_volume,

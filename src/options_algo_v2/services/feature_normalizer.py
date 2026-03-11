@@ -52,6 +52,11 @@ def normalize_raw_features_to_payload(
         underlying_quote_age_seconds=raw.underlying_quote_age_seconds,
         close=raw.close,
         dma20=raw.dma20,
+        dma50=raw.dma50,
         atr20=raw.atr20,
+        adx14=raw.adx14,
+        iv_rank=raw.iv_rank,
+        iv_hv_ratio=raw.iv_hv_ratio,
+        market_breadth_pct_above_20dma=raw.market_breadth_pct_above_20dma,
         expected_move_fit=expected_move_fit,
     )

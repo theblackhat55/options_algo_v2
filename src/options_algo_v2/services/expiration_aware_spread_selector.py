@@ -20,6 +20,9 @@ from options_algo_v2.services.options_spread_selector import (
     select_vertical_call_spread_candidates,
     select_vertical_put_spread_candidates,
 )
+from options_algo_v2.services.runtime_execution_settings import (
+    get_runtime_execution_settings,
+)
 
 
 def select_spread_candidates_across_expirations(
@@ -87,6 +90,8 @@ def _filter_quotes_for_strategy(
     strategy_family: str,
     quotes: list[OptionQuote],
 ) -> list[OptionQuote]:
+    execution_settings = get_runtime_execution_settings()
+
     if strategy_family == "BULL_CALL_SPREAD":
         calls = [
             quote for quote in quotes if str(quote.option_type).lower() == "call"
@@ -96,7 +101,11 @@ def _filter_quotes_for_strategy(
             min_abs_delta=0.20,
             max_abs_delta=0.45,
         )
-        return filtered or calls
+        if filtered:
+            return filtered
+        if execution_settings.allow_relaxed_liquidity_thresholds:
+            return calls
+        return []
 
     if strategy_family == "BULL_PUT_SPREAD":
         puts = [
@@ -107,6 +116,10 @@ def _filter_quotes_for_strategy(
             min_abs_delta=0.15,
             max_abs_delta=0.35,
         )
-        return filtered or puts
+        if filtered:
+            return filtered
+        if execution_settings.allow_relaxed_liquidity_thresholds:
+            return puts
+        return []
 
     return []

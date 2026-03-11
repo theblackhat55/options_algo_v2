@@ -60,10 +60,10 @@ def test_select_vertical_call_spread_candidates_returns_ordered_pairs() -> None:
 
     assert len(candidates) == 2
     assert candidates[0].strategy_family == "BULL_CALL_SPREAD"
-    assert candidates[0].short_leg.strike == 145.0
-    assert candidates[0].long_leg.strike == 150.0
-    assert candidates[1].short_leg.strike == 150.0
-    assert candidates[1].long_leg.strike == 155.0
+    assert candidates[0].long_leg.strike == 145.0
+    assert candidates[0].short_leg.strike == 150.0
+    assert candidates[1].long_leg.strike == 150.0
+    assert candidates[1].short_leg.strike == 155.0
 
 
 def test_select_vertical_put_spread_candidates_returns_descending_pairs() -> None:

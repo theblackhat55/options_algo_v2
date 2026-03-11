@@ -14,8 +14,9 @@ class OptionQuote:
     ask: float
     mid: float
     delta: float | None
-    open_interest: int
-    volume: int
+    implied_volatility: float | None = None
+    open_interest: int = 0
+    volume: int = 0
 
 
 @dataclass(frozen=True)

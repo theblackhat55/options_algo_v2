@@ -37,6 +37,9 @@ from options_algo_v2.services.options_chain_provider_factory import (
     get_options_chain_provider_name,
     get_options_chain_provider_source,
 )
+from options_algo_v2.services.runtime_execution_settings import (
+    get_runtime_execution_settings,
+)
 from options_algo_v2.services.runtime_mode import get_runtime_mode
 from options_algo_v2.services.scan_trade_candidate_builder import (
     build_serialized_trade_candidates,
@@ -68,6 +71,70 @@ from options_algo_v2.services.trade_idea_diagnostics import (
 )
 
 
+def _feature_sources_by_symbol(
+    feature_sources: list[dict[str, str]],
+) -> dict[str, dict[str, str]]:
+    by_symbol: dict[str, dict[str, str]] = {}
+    for item in feature_sources:
+        symbol = item.get("symbol")
+        if isinstance(symbol, str) and symbol:
+            by_symbol[symbol] = dict(item)
+    return by_symbol
+
+
+def _build_feature_debug_by_symbol(
+    feature_sources: list[dict[str, str]],
+) -> dict[str, dict[str, object]]:
+    by_symbol = _feature_sources_by_symbol(feature_sources)
+
+    result: dict[str, dict[str, object]] = {}
+    for symbol, source in by_symbol.items():
+        result[symbol] = {
+            "symbol": symbol,
+            "dataset": source.get("dataset"),
+            "schema": source.get("schema"),
+            "historical_row_provider": source.get("historical_row_provider"),
+            "market_breadth_provider": source.get("market_breadth_provider"),
+        }
+    return result
+
+
+def _build_decision_trace_by_symbol(
+    serialized_decisions: list[dict[str, object]],
+) -> dict[str, dict[str, object]]:
+    result: dict[str, dict[str, object]] = {}
+
+    for item in serialized_decisions:
+        symbol = item.get("symbol")
+        if not isinstance(symbol, str) or not symbol:
+            continue
+
+        rejection_reasons = item.get("rejection_reasons")
+        if isinstance(rejection_reasons, list):
+            reasons = [str(x) for x in rejection_reasons]
+        else:
+            reasons = []
+
+        result[symbol] = {
+            "symbol": symbol,
+            "directional_state": item.get("directional_state"),
+            "market_regime": item.get("market_regime"),
+            "iv_state": item.get("iv_state"),
+            "signal_state": item.get("signal_state"),
+            "strategy_type": item.get("strategy_type"),
+            "final_passed": item.get("final_passed"),
+            "final_score": item.get("final_score"),
+            "min_score_required": item.get("min_score_required"),
+            "rationale": item.get("rationale"),
+            "rejection_reasons": reasons,
+            "event_filter": item.get("event_filter"),
+            "extension_filter": item.get("extension_filter"),
+            "liquidity_filter": item.get("liquidity_filter"),
+        }
+
+    return result
+
+
 def build_scan_summary(decisions: list[CandidateDecision]) -> ScanSummary:
     passed_symbols = [d.candidate.symbol for d in decisions if d.final_passed]
     rejected_symbols = [d.candidate.symbol for d in decisions if not d.final_passed]
@@ -88,8 +155,10 @@ def build_scan_result(
     *,
     run_id: str,
     decisions: list[CandidateDecision],
+    degraded_metadata: dict[str, object] | None = None,
 ) -> ScanResult:
     configs = load_rulebook_configs()
+    execution_settings = get_runtime_execution_settings()
 
     config_versions = {
         "universe": str(configs.universe.get("version", "unknown")),
@@ -119,8 +188,13 @@ def build_scan_result(
     trade_candidates = build_serialized_trade_candidates(
         decisions=decisions,
         expiration="2026-04-17",
-        min_open_interest=0 if runtime_mode == "live" else 900,
-        max_bid_ask_spread_width=5.0 if runtime_mode == "live" else 0.5,
+        min_open_interest=0
+        if execution_settings.allow_relaxed_liquidity_thresholds and runtime_mode == "live"
+        else 900,
+        max_bid_ask_spread_width=5.0
+        if execution_settings.allow_relaxed_liquidity_thresholds and runtime_mode == "live"
+        else 0.5,
+        as_of_date=execution_settings.as_of_date,
     )
     ranked_trade_candidates = rank_trade_candidates(trade_candidates)
     top_trade_candidates = select_top_trade_candidates(
@@ -140,6 +214,8 @@ def build_scan_result(
     ]
 
     runtime_metadata: dict[str, object] = {
+        "feature_debug_by_symbol": _build_feature_debug_by_symbol(feature_sources),
+        "decision_trace_by_symbol": _build_decision_trace_by_symbol(serialized_decisions),
         "runtime_mode": get_runtime_mode(),
         "databento": build_databento_runtime_info(),
         "historical_row_provider": get_historical_row_provider_name(),
@@ -194,6 +270,9 @@ def build_scan_result(
         ),
         "top_trade_summary_rows": top_trade_summary_rows,
     }
+
+    if degraded_metadata:
+        runtime_metadata.update(degraded_metadata)
 
     return ScanResult(
         run_id=run_id,

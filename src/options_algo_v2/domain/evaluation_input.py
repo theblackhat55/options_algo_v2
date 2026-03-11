@@ -26,3 +26,8 @@ class CandidateEvaluationInput:
     dma20: float
     atr20: float
     expected_move_fit: bool
+    dma50: float = 0.0
+    adx14: float = 10.0
+    iv_rank: float = 45.0
+    iv_hv_ratio: float = 1.10
+    market_breadth_pct_above_20dma: float = 50.0
