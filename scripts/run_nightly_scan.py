@@ -403,7 +403,16 @@ def _build_raw_feature_with_fallback(
     breadth_provider: object,
     options_chain_provider: object,
     as_of_date: date,
-) -> tuple[object, str, bool, bool, bool, bool]:
+) -> tuple[
+    object,
+    str,
+    bool,
+    bool,
+    bool,
+    bool,
+    list[dict[str, object]],
+    OptionsChainSnapshot | None,
+]:
     settings = get_runtime_execution_settings()
     runtime_mode = os.environ.get("OPTIONS_ALGO_RUNTIME_MODE", "mock").strip().lower()
 
@@ -437,7 +446,22 @@ def _build_raw_feature_with_fallback(
                 entry_date=as_of_date,
                 dte_days=35,
             )
-            return raw, "primary", used_breadth_override, True, False, False
+            mock_bar_rows = _get_bar_rows(
+                row_provider=row_provider,
+                symbol=symbol,
+                dataset=dataset,
+                schema=schema,
+            )
+            return (
+                raw,
+                "primary",
+                used_breadth_override,
+                True,
+                False,
+                False,
+                mock_bar_rows,
+                None,
+            )
         except Exception:
             if not settings.allow_mock_historical_fallback:
                 raise
@@ -461,7 +485,22 @@ def _build_raw_feature_with_fallback(
                 entry_date=as_of_date,
                 dte_days=35,
             )
-            return raw, "mock_fallback", used_breadth_override, True, False, False
+            mock_bar_rows = _get_bar_rows(
+                row_provider=fallback_provider,
+                symbol=symbol,
+                dataset=dataset,
+                schema=schema,
+            )
+            return (
+                raw,
+                "mock_fallback",
+                used_breadth_override,
+                True,
+                False,
+                False,
+                mock_bar_rows,
+                None,
+            )
 
     bar_rows = _get_bar_rows(
         row_provider=row_provider,
@@ -530,6 +569,8 @@ def _build_raw_feature_with_fallback(
             used_placeholder_iv_rank,
             used_placeholder_iv_hv_ratio,
             used_placeholder_liquidity_inputs,
+            bar_rows,
+            snapshot,
         )
     except ValueError as exc:
         if "no rows provided to build bar history" not in str(exc):
@@ -555,6 +596,8 @@ def _build_raw_feature_with_fallback(
         used_placeholder_iv_rank,
         used_placeholder_iv_hv_ratio,
         used_placeholder_liquidity_inputs,
+        bar_rows,
+        snapshot,
     )
 
 
@@ -604,6 +647,8 @@ def run_nightly_scan(
             used_placeholder_iv_rank,
             used_placeholder_iv_hv_ratio,
             used_placeholder_liquidity_inputs,
+            bar_rows,
+            snapshot,
         ) = _build_raw_feature_with_fallback(
             symbol=symbol,
             row_provider=row_provider,
@@ -613,26 +658,16 @@ def run_nightly_scan(
         )
         historical_provider_modes[symbol] = provider_mode
 
-        snapshot_for_quality = _get_options_snapshot(
-            options_chain_provider=options_chain_provider,
-            symbol=symbol,
-        )
-        symbol_quote_quality_counts = _build_quote_quality_counts(snapshot_for_quality)
+        symbol_quote_quality_counts = _build_quote_quality_counts(snapshot)
         quote_quality_by_symbol[symbol] = symbol_quote_quality_counts
         aggregate_quote_quality_counts = _merge_quote_quality_counts(
             aggregate_quote_quality_counts,
             symbol_quote_quality_counts,
         )
-        bar_rows_for_debug = _get_bar_rows(
-            row_provider=row_provider,
-            symbol=symbol,
-            dataset="XNAS.ITCH",
-            schema="ohlcv-1d",
-        )
         liquidity_debug_by_symbol[symbol] = _build_liquidity_debug_info(
             symbol=symbol,
-            bar_rows=bar_rows_for_debug,
-            snapshot=snapshot_for_quality,
+            bar_rows=bar_rows,
+            snapshot=snapshot,
         )
 
         if used_placeholder_iv_rank:
