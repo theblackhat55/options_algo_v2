@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
+from time import sleep
+from urllib.error import URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
@@ -13,8 +15,20 @@ JsonDict = dict[str, object]
 
 
 def _default_fetch_json(url: str, timeout_seconds: float) -> JsonDict:
-    with urlopen(url, timeout=timeout_seconds) as response:  # noqa: S310
-        return json.loads(response.read().decode("utf-8"))
+    attempts = 3
+    last_error: Exception | None = None
+
+    for attempt in range(1, attempts + 1):
+        try:
+            with urlopen(url, timeout=timeout_seconds) as response:  # noqa: S310
+                return json.loads(response.read().decode("utf-8"))
+        except (URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
+            last_error = exc
+            if attempt == attempts:
+                break
+            sleep(0.5 * attempt)
+
+    raise RuntimeError(f"polygon fetch failed after {attempts} attempts: {last_error}")
 
 
 @dataclass(frozen=True)
@@ -24,7 +38,7 @@ class PolygonLiveOptionsChainClient:
     source: str = "polygon"
 
     def get_chain(self, symbol: str) -> OptionsChainSnapshot:
-        raise NotImplementedError("polygon live options chain client is not implemented")
+        return self.get_chain_snapshot(symbol)
 
     def get_chain_snapshot(self, symbol: str) -> OptionsChainSnapshot:
         settings = self.settings or PolygonSettings.from_env()
@@ -131,7 +145,6 @@ class PolygonLiveOptionsChainClient:
 
         open_interest = int(self._to_float(item.get("open_interest")) or 0.0)
 
-        day = item.get("day")
         volume = 0
         if isinstance(day, dict):
             volume = int(self._to_float(day.get("volume")) or 0.0)
@@ -164,7 +177,6 @@ class PolygonLiveOptionsChainClient:
         if value > 3.0:
             return value / 100.0
         return value
-
 
     @staticmethod
     def _to_float(value: object) -> float | None:

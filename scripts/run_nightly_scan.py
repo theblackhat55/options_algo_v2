@@ -5,6 +5,7 @@ import os
 from datetime import date
 from pathlib import Path
 
+from options_algo_v2.domain.options_chain import OptionQuote, OptionsChainSnapshot
 from options_algo_v2.services.batch_evaluator import evaluate_raw_feature_batch
 from options_algo_v2.services.historical_row_provider_factory import (
     MockHistoricalRowProvider,
@@ -18,12 +19,13 @@ from options_algo_v2.services.iv_rank_history import (
     IvProxyObservation,
     append_iv_proxy_observation,
     compute_iv_rank_from_history,
+    count_iv_proxy_observations,
     default_iv_rank_history_path,
+    list_iv_proxy_observation_counts,
 )
-
-IV_RANK_TRAILING_OBSERVATIONS = 20
 from options_algo_v2.services.live_raw_feature_pipeline import (
     build_live_raw_feature_input,
+    build_live_raw_feature_input_from_rows,
 )
 from options_algo_v2.services.market_breadth_provider_factory import (
     build_market_breadth_provider,
@@ -39,6 +41,8 @@ from options_algo_v2.services.scan_artifact_orchestrator import (
     build_and_write_scan_artifact,
 )
 from options_algo_v2.services.universe_loader import load_universe_symbols
+
+IV_RANK_TRAILING_OBSERVATIONS = 20
 
 
 def _load_symbols_from_watchlist(path: Path) -> list[str]:
@@ -109,11 +113,14 @@ def _get_options_snapshot(
     *,
     options_chain_provider: object,
     symbol: str,
-) -> object | None:
+) -> OptionsChainSnapshot | None:
     get_chain = getattr(options_chain_provider, "get_chain", None)
     if get_chain is None:
         return None
-    return get_chain(symbol)
+    snapshot = get_chain(symbol)
+    if not isinstance(snapshot, OptionsChainSnapshot):
+        return None
+    return snapshot
 
 
 def _get_latest_close(bar_rows: list[dict[str, object]]) -> float | None:
@@ -127,33 +134,64 @@ def _get_latest_close(bar_rows: list[dict[str, object]]) -> float | None:
     return None
 
 
+def _average_daily_volume_from_bar_rows(bar_rows: list[dict[str, object]]) -> float | None:
+    volumes = [
+        float(row["volume"])
+        for row in bar_rows
+        if isinstance(row, dict) and isinstance(row.get("volume"), int | float)
+    ]
+    if not volumes:
+        return None
+    return sum(volumes) / len(volumes)
+
+
+def _quote_quality_key(
+    quote: OptionQuote,
+    *,
+    underlying_price: float,
+) -> tuple[float, float, int, int]:
+    distance = abs(quote.strike - underlying_price)
+    spread_width = max(0.0, quote.ask - quote.bid)
+    return (
+        distance,
+        spread_width,
+        -int(quote.open_interest),
+        -int(quote.volume),
+    )
+
+
+def _select_reference_quote(
+    *,
+    snapshot: OptionsChainSnapshot,
+    underlying_price: float,
+) -> OptionQuote | None:
+    candidates = [
+        quote
+        for quote in snapshot.quotes
+        if quote.bid > 0
+        and quote.ask > 0
+        and quote.ask >= quote.bid
+    ]
+    if not candidates:
+        return None
+    candidates.sort(
+        key=lambda quote: _quote_quality_key(
+            quote,
+            underlying_price=underlying_price,
+        )
+    )
+    return candidates[0]
+
+
 def _compute_live_iv_metrics(
     *,
     symbol: str,
-    row_provider: object,
-    options_chain_provider: object,
-    dataset: str,
-    schema: str,
+    bar_rows: list[dict[str, object]],
+    snapshot: OptionsChainSnapshot | None,
     as_of_date: date,
 ) -> tuple[float | None, float | None]:
-    bar_rows = _get_bar_rows(
-        row_provider=row_provider,
-        symbol=symbol,
-        dataset=dataset,
-        schema=schema,
-    )
-    if not bar_rows:
-        return None, None
-
     latest_close = _get_latest_close(bar_rows)
-    if latest_close is None or latest_close <= 0:
-        return None, None
-
-    snapshot = _get_options_snapshot(
-        options_chain_provider=options_chain_provider,
-        symbol=symbol,
-    )
-    if snapshot is None:
+    if latest_close is None or latest_close <= 0 or snapshot is None:
         return None, None
 
     implied_vol_proxy = estimate_near_atm_implied_vol(
@@ -188,6 +226,52 @@ def _compute_live_iv_metrics(
     return iv_rank, iv_hv_ratio
 
 
+def _build_live_liquidity_inputs(
+    *,
+    symbol: str,
+    bar_rows: list[dict[str, object]],
+    snapshot: OptionsChainSnapshot | None,
+) -> tuple[dict[str, int | float], bool]:
+    latest_close = _get_latest_close(bar_rows)
+    avg_daily_volume = _average_daily_volume_from_bar_rows(bar_rows)
+
+    if latest_close is None or snapshot is None or avg_daily_volume is None:
+        return {
+            "avg_daily_volume": 2_000_000.0,
+            "option_open_interest": 2_000,
+            "option_volume": 400,
+            "bid": 2.45,
+            "ask": 2.55,
+            "option_quote_age_seconds": 10,
+            "underlying_quote_age_seconds": 2,
+        }, True
+
+    reference_quote = _select_reference_quote(
+        snapshot=snapshot,
+        underlying_price=latest_close,
+    )
+    if reference_quote is None:
+        return {
+            "avg_daily_volume": avg_daily_volume,
+            "option_open_interest": 2_000,
+            "option_volume": 400,
+            "bid": 2.45,
+            "ask": 2.55,
+            "option_quote_age_seconds": 10,
+            "underlying_quote_age_seconds": 2,
+        }, True
+
+    return {
+        "avg_daily_volume": avg_daily_volume,
+        "option_open_interest": int(reference_quote.open_interest),
+        "option_volume": int(reference_quote.volume),
+        "bid": float(reference_quote.bid),
+        "ask": float(reference_quote.ask),
+        "option_quote_age_seconds": 10,
+        "underlying_quote_age_seconds": 2,
+    }, True
+
+
 def _build_raw_feature_with_fallback(
     *,
     symbol: str,
@@ -195,8 +279,9 @@ def _build_raw_feature_with_fallback(
     breadth_provider: object,
     options_chain_provider: object,
     as_of_date: date,
-) -> tuple[object, str, bool, bool, bool]:
+) -> tuple[object, str, bool, bool, bool, bool]:
     settings = get_runtime_execution_settings()
+    runtime_mode = os.environ.get("OPTIONS_ALGO_RUNTIME_MODE", "mock").strip().lower()
 
     is_bullish = symbol in {"AAPL", "MSFT", "NVDA", "SPY", "QQQ"}
     market_breadth_pct_above_20dma, used_breadth_override = _get_market_breadth_pct(
@@ -207,13 +292,76 @@ def _build_raw_feature_with_fallback(
     dataset = "XNAS.ITCH"
     schema = "ohlcv-1d"
 
-    real_iv_rank, real_iv_hv_ratio = _compute_live_iv_metrics(
-        symbol=symbol,
+    if runtime_mode != "live":
+        try:
+            raw = build_live_raw_feature_input(
+                symbol=symbol,
+                dataset=dataset,
+                schema=schema,
+                provider=row_provider,
+                iv_rank=70.0 if is_bullish else 45.0,
+                iv_hv_ratio=1.30 if is_bullish else 1.10,
+                avg_daily_volume=8_000_000.0 if is_bullish else 5_000_000.0,
+                option_open_interest=2500 if is_bullish else 1800,
+                option_volume=800 if is_bullish else 500,
+                bid=2.48 if is_bullish else 1.94,
+                ask=2.52 if is_bullish else 1.98,
+                option_quote_age_seconds=15,
+                underlying_quote_age_seconds=2,
+                market_breadth_pct_above_20dma=market_breadth_pct_above_20dma,
+                earnings_date=None,
+                entry_date=as_of_date,
+                dte_days=35,
+            )
+            return raw, "primary", used_breadth_override, True, False, False
+        except Exception:
+            if not settings.allow_mock_historical_fallback:
+                raise
+            fallback_provider = MockHistoricalRowProvider()
+            raw = build_live_raw_feature_input(
+                symbol=symbol,
+                dataset=dataset,
+                schema=schema,
+                provider=fallback_provider,
+                iv_rank=70.0 if is_bullish else 45.0,
+                iv_hv_ratio=1.30 if is_bullish else 1.10,
+                avg_daily_volume=8_000_000.0 if is_bullish else 5_000_000.0,
+                option_open_interest=2500 if is_bullish else 1800,
+                option_volume=800 if is_bullish else 500,
+                bid=2.48 if is_bullish else 1.94,
+                ask=2.52 if is_bullish else 1.98,
+                option_quote_age_seconds=15,
+                underlying_quote_age_seconds=2,
+                market_breadth_pct_above_20dma=market_breadth_pct_above_20dma,
+                earnings_date=None,
+                entry_date=as_of_date,
+                dte_days=35,
+            )
+            return raw, "mock_fallback", used_breadth_override, True, False, False
+
+    bar_rows = _get_bar_rows(
         row_provider=row_provider,
-        options_chain_provider=options_chain_provider,
+        symbol=symbol,
         dataset=dataset,
         schema=schema,
+    )
+
+    snapshot = _get_options_snapshot(
+        options_chain_provider=options_chain_provider,
+        symbol=symbol,
+    )
+
+    real_iv_rank, real_iv_hv_ratio = _compute_live_iv_metrics(
+        symbol=symbol,
+        bar_rows=bar_rows,
+        snapshot=snapshot,
         as_of_date=as_of_date,
+    )
+
+    liquidity_inputs, used_placeholder_liquidity_inputs = _build_live_liquidity_inputs(
+        symbol=symbol,
+        bar_rows=bar_rows,
+        snapshot=snapshot,
     )
 
     used_placeholder_iv_rank = real_iv_rank is None
@@ -221,21 +369,25 @@ def _build_raw_feature_with_fallback(
 
     common_kwargs = {
         "symbol": symbol,
-        "dataset": dataset,
-        "schema": schema,
-        "iv_rank": real_iv_rank if real_iv_rank is not None else (70.0 if is_bullish else 45.0),
+        "iv_rank": (
+            real_iv_rank
+            if real_iv_rank is not None
+            else (70.0 if is_bullish else 45.0)
+        ),
         "iv_hv_ratio": (
             real_iv_hv_ratio
             if real_iv_hv_ratio is not None
             else (1.30 if is_bullish else 1.10)
         ),
-        "avg_daily_volume": 5_000_000 if is_bullish else 2_000_000,
-        "option_open_interest": 2_000,
-        "option_volume": 400,
-        "bid": 2.45,
-        "ask": 2.55,
-        "option_quote_age_seconds": 10,
-        "underlying_quote_age_seconds": 2,
+        "avg_daily_volume": float(liquidity_inputs["avg_daily_volume"]),
+        "option_open_interest": int(liquidity_inputs["option_open_interest"]),
+        "option_volume": int(liquidity_inputs["option_volume"]),
+        "bid": float(liquidity_inputs["bid"]),
+        "ask": float(liquidity_inputs["ask"]),
+        "option_quote_age_seconds": int(liquidity_inputs["option_quote_age_seconds"]),
+        "underlying_quote_age_seconds": int(
+            liquidity_inputs["underlying_quote_age_seconds"]
+        ),
         "market_breadth_pct_above_20dma": market_breadth_pct_above_20dma,
         "earnings_date": None,
         "entry_date": as_of_date,
@@ -243,8 +395,8 @@ def _build_raw_feature_with_fallback(
     }
 
     try:
-        raw = build_live_raw_feature_input(
-            provider=row_provider,
+        raw = build_live_raw_feature_input_from_rows(
+            rows=bar_rows,
             **common_kwargs,
         )
         return (
@@ -253,6 +405,7 @@ def _build_raw_feature_with_fallback(
             used_breadth_override,
             used_placeholder_iv_rank,
             used_placeholder_iv_hv_ratio,
+            used_placeholder_liquidity_inputs,
         )
     except ValueError as exc:
         if "no rows provided to build bar history" not in str(exc):
@@ -265,6 +418,9 @@ def _build_raw_feature_with_fallback(
 
     fallback_provider = MockHistoricalRowProvider()
     raw = build_live_raw_feature_input(
+        symbol=symbol,
+        dataset=dataset,
+        schema=schema,
         provider=fallback_provider,
         **common_kwargs,
     )
@@ -274,6 +430,7 @@ def _build_raw_feature_with_fallback(
         used_breadth_override,
         used_placeholder_iv_rank,
         used_placeholder_iv_hv_ratio,
+        used_placeholder_liquidity_inputs,
     )
 
 
@@ -300,6 +457,7 @@ def run_nightly_scan(
     breadth_override_symbols: list[str] = []
     placeholder_iv_rank_symbols: list[str] = []
     placeholder_iv_hv_ratio_symbols: list[str] = []
+    placeholder_liquidity_symbols: list[str] = []
     iv_rank_ready_symbols: list[str] = []
 
     for symbol in selected_symbols:
@@ -309,6 +467,7 @@ def run_nightly_scan(
             used_breadth_override,
             used_placeholder_iv_rank,
             used_placeholder_iv_hv_ratio,
+            used_placeholder_liquidity_inputs,
         ) = _build_raw_feature_with_fallback(
             symbol=symbol,
             row_provider=row_provider,
@@ -323,6 +482,8 @@ def run_nightly_scan(
             iv_rank_ready_symbols.append(symbol)
         if used_placeholder_iv_hv_ratio:
             placeholder_iv_hv_ratio_symbols.append(symbol)
+        if used_placeholder_liquidity_inputs:
+            placeholder_liquidity_symbols.append(symbol)
         if used_breadth_override:
             breadth_override_symbols.append(symbol)
         raw_features.append(raw)
@@ -333,6 +494,7 @@ def run_nightly_scan(
     )
     used_placeholder_iv_rank_inputs = bool(placeholder_iv_rank_symbols)
     used_placeholder_iv_hv_ratio_inputs = bool(placeholder_iv_hv_ratio_symbols)
+    used_placeholder_liquidity_inputs = bool(placeholder_liquidity_symbols)
     used_placeholder_iv_inputs = (
         used_placeholder_iv_rank_inputs or used_placeholder_iv_hv_ratio_inputs
     )
@@ -340,14 +502,19 @@ def run_nightly_scan(
         bool(breadth_override_symbols)
         or used_mock_historical_fallback
         or used_placeholder_iv_inputs
+        or used_placeholder_liquidity_inputs
     )
 
     if execution_settings.strict_live_mode and (
-        used_placeholder_iv_rank_inputs or used_placeholder_iv_hv_ratio_inputs
+        used_placeholder_iv_rank_inputs
+        or used_placeholder_iv_hv_ratio_inputs
+        or used_placeholder_liquidity_inputs
     ):
         raise RuntimeError(
-            "placeholder IV inputs are not allowed in strict live mode"
+            "placeholder live inputs are not allowed in strict live mode"
         )
+
+    history_path = default_iv_rank_history_path()
 
     decisions = evaluate_raw_feature_batch(raw_features)
     artifact_result = build_and_write_scan_artifact(
@@ -362,12 +529,19 @@ def run_nightly_scan(
             "used_placeholder_iv_inputs": used_placeholder_iv_inputs,
             "used_placeholder_iv_rank_inputs": used_placeholder_iv_rank_inputs,
             "used_placeholder_iv_hv_ratio_inputs": used_placeholder_iv_hv_ratio_inputs,
+            "used_placeholder_liquidity_inputs": used_placeholder_liquidity_inputs,
             "placeholder_iv_rank_symbols": placeholder_iv_rank_symbols,
             "placeholder_iv_hv_ratio_symbols": placeholder_iv_hv_ratio_symbols,
+            "placeholder_liquidity_symbols": placeholder_liquidity_symbols,
             "iv_rank_ready_symbols": iv_rank_ready_symbols,
             "iv_rank_insufficient_history_symbols": placeholder_iv_rank_symbols,
-            "iv_rank_history_path": str(default_iv_rank_history_path()),
+            "iv_rank_history_path": str(history_path),
             "iv_rank_trailing_observations": IV_RANK_TRAILING_OBSERVATIONS,
+            "iv_rank_observation_counts": list_iv_proxy_observation_counts(history_path),
+            "iv_rank_observation_count_by_symbol": {
+                symbol: count_iv_proxy_observations(path=history_path, symbol=symbol)
+                for symbol in selected_symbols
+            },
             "degraded_live_mode": degraded_live_mode,
         },
     )
@@ -398,12 +572,21 @@ def run_nightly_scan(
         )
     print(f"iv_rank_ready_symbols={iv_rank_ready_symbols}")
     print(f"iv_rank_insufficient_history_symbols={placeholder_iv_rank_symbols}")
-    print(f"iv_rank_history_path={default_iv_rank_history_path()}")
+    print(f"iv_rank_history_path={history_path}")
     print(f"iv_rank_trailing_observations={IV_RANK_TRAILING_OBSERVATIONS}")
+    print(
+        "iv_rank_observation_count_by_symbol="
+        f"{runtime_metadata.get('iv_rank_observation_count_by_symbol', {})}"
+    )
     if placeholder_iv_hv_ratio_symbols:
         print(
             "WARNING: placeholder IV/HV ratio inputs used for symbols="
             f"{placeholder_iv_hv_ratio_symbols}"
+        )
+    if placeholder_liquidity_symbols:
+        print(
+            "WARNING: placeholder liquidity inputs used for symbols="
+            f"{placeholder_liquidity_symbols}"
         )
 
     print(

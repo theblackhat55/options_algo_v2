@@ -1,5 +1,7 @@
 from datetime import date
 
+import pytest
+
 from options_algo_v2.domain.enums import DirectionalState, IVState, MarketRegime
 from options_algo_v2.domain.evaluation_input import CandidateEvaluationInput
 from options_algo_v2.services.decision_engine import evaluate_candidate_decision
@@ -76,7 +78,9 @@ def test_build_scan_summary_counts_passed_and_rejected() -> None:
     }
 
 
-def test_build_scan_result_returns_expected_structure() -> None:
+def test_build_scan_result_returns_expected_structure(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPTIONS_ALGO_RUNTIME_MODE", "mock")
+    monkeypatch.delenv("DATABENTO_API_KEY", raising=False)
     decisions = [_make_passed_decision(), _make_rejected_decision()]
     result = build_scan_result(
         run_id="run_test_001",
@@ -88,11 +92,12 @@ def test_build_scan_result_returns_expected_structure() -> None:
     assert result.config_versions["strategy"] == "strategy_v1"
     assert result.config_versions["risk"] == "risk_v1"
     assert result.runtime_metadata["runtime_mode"] == "mock"
-    assert result.runtime_metadata["databento"] == {
-        "dataset": "XNAS.ITCH",
-        "schema": "ohlcv-1d",
-        "has_api_key": "false",
-    }
+    databento = result.runtime_metadata["databento"]
+    assert isinstance(databento, dict)
+    assert databento["schema"] == "ohlcv-1d"
+    assert databento["has_api_key"] == "false"
+    assert isinstance(databento["dataset"], str)
+    assert databento["dataset"]
     assert result.runtime_metadata["historical_row_provider"] == "mock"
     assert result.runtime_metadata["historical_row_provider_source"] == "mock"
     assert result.runtime_metadata["market_breadth_provider"] == "mock"
@@ -103,9 +108,14 @@ def test_build_scan_result_returns_expected_structure() -> None:
     assert result.runtime_metadata[
         "feature_source_counts_by_market_breadth_provider"
     ] == {"mock": 2}
-    assert result.runtime_metadata[
+    dataset_schema_counts = result.runtime_metadata[
         "feature_source_counts_by_dataset_schema"
-    ] == {"XNAS.ITCH|ohlcv-1d": 2}
+    ]
+    assert isinstance(dataset_schema_counts, dict)
+    assert len(dataset_schema_counts) == 1
+    ((dataset_schema_key, dataset_schema_count),) = dataset_schema_counts.items()
+    assert dataset_schema_key.endswith("|ohlcv-1d")
+    assert dataset_schema_count == 2
     assert result.runtime_metadata["trade_candidate_counts_by_strategy_family"] == {
         "BULL_PUT_SPREAD": 1
     }

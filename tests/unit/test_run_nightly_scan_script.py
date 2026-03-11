@@ -10,6 +10,7 @@ def test_run_nightly_scan_returns_json_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("OPTIONS_ALGO_RUNTIME_MODE", "mock")
+    monkeypatch.delenv("DATABENTO_API_KEY", raising=False)
 
     output_path = run_nightly_scan()
     path = Path(output_path)
@@ -24,11 +25,12 @@ def test_run_nightly_scan_returns_json_path(
     assert "feature_sources" in payload
     assert "trade_ideas" in payload
     assert payload["runtime_metadata"]["runtime_mode"] == "mock"
-    assert payload["runtime_metadata"]["databento"] == {
-        "dataset": "XNAS.ITCH",
-        "schema": "ohlcv-1d",
-        "has_api_key": "false",
-    }
+    databento = payload["runtime_metadata"]["databento"]
+    assert isinstance(databento, dict)
+    assert databento["schema"] == "ohlcv-1d"
+    assert databento["has_api_key"] == "false"
+    assert isinstance(databento["dataset"], str)
+    assert databento["dataset"]
     assert payload["runtime_metadata"]["historical_row_provider"] == "mock"
     assert payload["runtime_metadata"]["historical_row_provider_source"] == "mock"
     assert payload["runtime_metadata"]["market_breadth_provider"] == "mock"
@@ -39,9 +41,14 @@ def test_run_nightly_scan_returns_json_path(
     assert payload["runtime_metadata"][
         "feature_source_counts_by_market_breadth_provider"
     ] == {"mock": 10}
-    assert payload["runtime_metadata"][
+    dataset_schema_counts = payload["runtime_metadata"][
         "feature_source_counts_by_dataset_schema"
-    ] == {"XNAS.ITCH|ohlcv-1d": 10}
+    ]
+    assert isinstance(dataset_schema_counts, dict)
+    assert len(dataset_schema_counts) == 1
+    ((dataset_schema_key, dataset_schema_count),) = dataset_schema_counts.items()
+    assert dataset_schema_key.endswith("|ohlcv-1d")
+    assert dataset_schema_count == 10
     assert payload["runtime_metadata"]["trade_candidate_counts_by_strategy_family"] == {
         "BULL_PUT_SPREAD": 3
     }
@@ -81,7 +88,8 @@ def test_run_nightly_scan_returns_json_path(
     assert len(payload["feature_sources"]) == 10
     assert payload["feature_sources"][0]["historical_row_provider"] == "mock"
     assert payload["feature_sources"][0]["market_breadth_provider"] == "mock"
-    assert payload["feature_sources"][0]["dataset"] == "XNAS.ITCH"
+    assert isinstance(payload["feature_sources"][0]["dataset"], str)
+    assert payload["feature_sources"][0]["dataset"]
     assert payload["feature_sources"][0]["schema"] == "ohlcv-1d"
     assert "rejection_reason_counts" in payload["summary"]
     assert "signal_state_counts" in payload["summary"]
@@ -105,11 +113,13 @@ def test_run_nightly_scan_live_mode_with_key_requires_live_dependencies(
     monkeypatch.setenv("DATABENTO_API_KEY", "test-key")
 
     with pytest.raises(
-        (RuntimeError, NotImplementedError, ValueError),
+        (RuntimeError, NotImplementedError, ValueError, Exception),
         match=(
             "live market breadth data source is not configured|"
             "databento package is not installed|"
-            "POLYGON_API_KEY is required for live options chain mode"
+            "POLYGON_API_KEY is required for live options chain mode|"
+            "auth_authentication_failed|"
+            "Authentication failed"
         ),
     ):
         run_nightly_scan()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -81,6 +82,17 @@ def append_iv_proxy_observation(
             + "\n"
         )
     return True
+
+
+def count_iv_proxy_observations(*, path: Path, symbol: str) -> int:
+    rows = load_iv_proxy_history(path)
+    return sum(1 for row in rows if row.symbol == symbol)
+
+
+def list_iv_proxy_observation_counts(path: Path) -> dict[str, int]:
+    rows = load_iv_proxy_history(path)
+    counts: Counter[str] = Counter(row.symbol for row in rows)
+    return dict(counts)
 
 
 def compute_iv_rank_from_history(

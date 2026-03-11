@@ -18,7 +18,7 @@ def test_polygon_live_options_chain_client_stores_settings() -> None:
     assert client.source == "polygon"
 
 
-def test_polygon_live_options_chain_client_raises_not_implemented() -> None:
+def test_polygon_live_options_chain_client_raises_runtime_error_on_http_failure() -> None:
     client = PolygonLiveOptionsChainClient(
         settings=PolygonSettings(
             api_key="test-key",
@@ -27,8 +27,8 @@ def test_polygon_live_options_chain_client_raises_not_implemented() -> None:
     )
 
     with pytest.raises(
-        NotImplementedError,
-        match="polygon live options chain client is not implemented",
+        RuntimeError,
+        match="polygon fetch failed after 3 attempts",
     ):
         client.get_chain(symbol="AAPL")
 

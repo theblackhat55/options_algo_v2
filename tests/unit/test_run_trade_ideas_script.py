@@ -13,6 +13,7 @@ def test_run_trade_ideas_returns_json_path_and_prints_trade_ideas(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.setenv("OPTIONS_ALGO_RUNTIME_MODE", "mock")
+    monkeypatch.delenv("DATABENTO_API_KEY", raising=False)
 
     output_path = run_trade_ideas()
     path = Path(output_path)

@@ -122,6 +122,7 @@ def _build_decision_trace_by_symbol(
             "iv_state": item.get("iv_state"),
             "signal_state": item.get("signal_state"),
             "strategy_type": item.get("strategy_type"),
+            "strategy_family": item.get("strategy_type"),
             "final_passed": item.get("final_passed"),
             "final_score": item.get("final_score"),
             "min_score_required": item.get("min_score_required"),

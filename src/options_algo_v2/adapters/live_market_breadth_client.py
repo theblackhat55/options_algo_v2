@@ -40,6 +40,8 @@ class LiveMarketBreadthClient:
 
     @staticmethod
     def _to_float(value: object) -> float | None:
+        if value is None:
+            return None
         if isinstance(value, bool):
             return None
         if isinstance(value, int | float):

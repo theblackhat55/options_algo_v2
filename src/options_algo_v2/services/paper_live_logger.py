@@ -32,10 +32,34 @@ def _ensure_parent(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
 
-def _append_jsonl(path: Path, row: dict[str, Any]) -> None:
+def _load_jsonl(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    for line in path.read_text().splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        rows.append(json.loads(stripped))
+    return rows
+
+
+def _append_jsonl_if_missing(
+    path: Path,
+    row: dict[str, Any],
+    *,
+    key_fields: list[str],
+) -> bool:
     _ensure_parent(path)
+    existing_rows = _load_jsonl(path)
+
+    for existing in existing_rows:
+        if all(existing.get(field) == row.get(field) for field in key_fields):
+            return False
+
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(row, sort_keys=True) + "\n")
+    return True
 
 
 def _append_csv_row(path: Path, row: dict[str, Any], fieldnames: list[str]) -> None:
@@ -167,9 +191,20 @@ def append_paper_live_logs(
     run_row = build_run_summary_row(payload)
     symbol_rows = build_symbol_rows(payload)
 
-    _append_jsonl(resolved_paths.run_jsonl, run_row)
+    wrote_run = _append_jsonl_if_missing(
+        resolved_paths.run_jsonl,
+        run_row,
+        key_fields=["run_id"],
+    )
     for row in symbol_rows:
-        _append_jsonl(resolved_paths.symbol_jsonl, row)
+        _append_jsonl_if_missing(
+            resolved_paths.symbol_jsonl,
+            row,
+            key_fields=["run_id", "symbol"],
+        )
+
+    if not wrote_run:
+        return
 
     csv_row = {
         "timestamp_utc": run_row["timestamp_utc"],
