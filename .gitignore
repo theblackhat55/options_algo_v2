@@ -19,3 +19,6 @@ logs/
 .env
 
 .env
+
+# local admin backups
+crontab.backup*

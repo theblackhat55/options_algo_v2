@@ -47,6 +47,9 @@ echo "latest_filtered_watchlist=${LATEST_FILTERED_WATCHLIST}"
 echo "==> Step 4: run paper-live daily"
 python scripts/run_paper_live_daily.py --watchlist "${LATEST_FILTERED_WATCHLIST}"
 
+echo "==> Step 5: build OpenClaw report"
+python scripts/build_openclaw_options_report.py
+
 echo "==> Done"
 echo "top_n=${TOP_N}"
 echo "base_watchlist=${LATEST_BASE_WATCHLIST}"
