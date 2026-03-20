@@ -1,9 +1,3 @@
-Below is a **detailed `RUNBOOK.md`** you can add to the repo.
-
-Use this command to create it:
-
-```bash
-cat > RUNBOOK.md <<'MD'
 # RUNBOOK
 
 ## Purpose
@@ -25,22 +19,30 @@ The platform scans underlyings, computes market/technical/volatility features, s
 
 At a high level the flow is:
 
-1. **Universe / watchlist input**
+1. **Universe / watchlist input** — 58-symbol universe across all 11 GICS sectors
 2. **Historical feature computation**
    - close
    - 20-day / 50-day moving averages
    - ATR20
    - ADX14
-3. **Market breadth + regime context**
+3. **Market breadth + regime context** (dead zone: 48-52%)
 4. **Options chain retrieval**
 5. **Volatility context**
    - `iv_hv_ratio` from live option IV proxy + historical vol
-   - `iv_rank` from persisted IV proxy history when enough observations exist
+   - `iv_rank` from persisted IV proxy history (60-observation lookback)
 6. **Decision engine**
-7. **Spread selection**
-8. **Trade candidate / trade idea generation**
+   - Directional classifier (RSI bands: 45-75 bullish / 25-55 bearish, no five_day_return hard gate)
+   - IV state classifier (asymmetric: IV_RICH requires 2-of-3 signals, IV_CHEAP requires 1)
+   - Continuous candidate scoring (ADX, IV ratio, breadth distance, momentum → 0-1 scores)
+7. **Spread selection** — config-driven DTE/delta bands from `strategy_v1.yaml`
+8. **Trade candidate ranking** — spread scoring model (delta fit, liquidity, efficiency)
 9. **Artifact generation**
 10. **Paper-live validation logging**
+
+### v2.1 analytical modules (available but not yet wired into main pipeline)
+- **Support/resistance validation** (`services/support_resistance.py`) — pivot-point S/R detection, strike validation
+- **Expected move comparison** (`services/expected_move.py`) — implied vs. forecast edge classification
+- **Regime transition awareness** (`services/regime_transition.py`) — transition detection, confidence, direction tracking
 
 ---
 
@@ -57,7 +59,7 @@ At a high level the flow is:
 - paper-live validation logs and review tooling
 
 ## Still transitional
-- `iv_rank` may remain placeholder until enough daily IV history accumulates
+- `iv_rank` may remain placeholder until enough daily IV history accumulates (needs 60 observations per symbol)
 
 ## Strict-live note
 Strict-live should remain blocked whenever placeholder IV inputs are still present.
@@ -78,10 +80,24 @@ Strict-live should remain blocked whenever placeholder IV inputs are still prese
 - `scripts/build_options_watchlist.py`
 - `scripts/run_strict_live_scan.py`
 
+## Key config
+- `config/strategy_v1.yaml` — strategy parameters (DTE min/target/max, delta bands, breadth thresholds, IV rank min observations)
+- `config/universe_v1.yaml` — 58-symbol trading universe
+
+## Core services
+- `services/feature_normalizer.py` — delegates to canonical classifiers
+- `services/candidate_ranker.py` — continuous scoring (ADX, IV ratio, breadth distance, momentum)
+- `services/trade_candidate_ranking.py` — spread-model-based ranking
+- `services/trade_candidate_orchestrator.py` — config-driven orchestration
+- `services/expiration_aware_spread_selector.py` — config-driven spread selection
+- `services/support_resistance.py` — S/R level detection and strike validation
+- `services/expected_move.py` — implied vs. forecast expected move comparison
+- `services/regime_transition.py` — regime transition detection and tracking
+- `services/iv_rank_history.py` — IV rank with 60-observation lookback
+
 ## Key docs
 - `docs/live_status_summary.md`
 - `docs/go_live_phases.md`
-- `docs/go_live_plan_v2_1.md` (if added)
 - `docs/watchlist_design.md`
 - `docs/options_watchlist_policy.md`
 
@@ -103,7 +119,7 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-Install dependencies according to your project’s existing setup.
+Install dependencies according to your project's existing setup.
 
 If your repo uses editable install:
 ```bash
@@ -188,8 +204,9 @@ PYTHONPATH=src python scripts/run_trade_ideas.py \
 
 ### What it does
 - runs the nightly scan
-- evaluates decisions
-- selects spreads
+- evaluates decisions using continuous scoring
+- selects spreads using config-driven DTE/delta bands
+- ranks candidates using spread scoring model (delta fit, liquidity, efficiency)
 - prints summary and trade ideas
 - writes a scan artifact under `data/scan_results/`
 
@@ -199,7 +216,7 @@ PYTHONPATH=src python scripts/run_trade_ideas.py \
 - total / passed / rejected counts
 - rejection reason counts
 - strategy type counts
-- top trade candidate symbols
+- top trade candidate symbols (ranked by spread score)
 - trade idea details
 
 ---
@@ -333,7 +350,7 @@ For each symbol it may display:
 - `iv_state`
 - `signal_state`
 - `strategy_type`
-- `final_score`
+- `final_score` (continuous, 0-1 scale)
 - rejection reasons
 - filter results
 
@@ -428,6 +445,9 @@ Recent runs should expose:
 - `iv_rank_history_path`
 - `iv_rank_trailing_observations`
 
+## Configuration
+The IV rank lookback is set to **60 observations** (`iv_rank_min_observations: 60` in `strategy_v1.yaml`). This means a symbol needs at least 60 daily IV proxy readings before its `iv_rank` is considered real.
+
 ## Why this matters
 Even though `iv_hv_ratio` is already real, `iv_rank` requires enough daily history before it can stop falling back to placeholders.
 
@@ -466,6 +486,7 @@ PYTHONPATH=src python scripts/paper_live_symbol_leaderboard.py --last-runs 5
 - `strategy not permitted in current regime` frequency
 - whether degraded mode is still present
 - whether placeholder IV rank symbols begin shrinking
+- continuous score distribution across candidates
 
 ---
 
@@ -492,6 +513,7 @@ Interpret it as:
 - the current rules are sparse
 - that symbol may be the clearest fit for the strategy
 - broader universe or more days may be needed before changing thresholds
+- check the continuous score — high scores (>0.7) suggest genuine signal strength
 
 ## Case C — Strict-live fails
 This is expected if:
@@ -536,7 +558,7 @@ set +a
 ```
 
 ## 14.4 Strict-live blocks because of placeholder IV inputs
-This is expected until `iv_rank` is fully real.
+This is expected until `iv_rank` is fully real (60 observations per symbol).
 
 Check:
 - `iv_rank_ready_symbols`
@@ -550,6 +572,7 @@ Inspect the latest scan artifact and review:
 - option leg symbols
 - spread width / debit / credit
 - final score and rationale
+- spread scoring components (delta fit, liquidity, efficiency)
 
 Use:
 ```bash
@@ -558,7 +581,25 @@ PYTHONPATH=src python scripts/inspect_scan_debug.py data/scan_results/<scan>.jso
 
 ---
 
-# 15. Validation / Quality Commands
+# 15. Configuration Reference
+
+## strategy_v1.yaml — key parameters
+
+| Parameter | Description |
+|---|---|
+| `breadth_bullish_threshold` | Breadth % above which regime is bullish (52.0) |
+| `breadth_bearish_threshold` | Breadth % below which regime is bearish (48.0) |
+| `iv_rank_min_observations` | Minimum IV proxy observations for real iv_rank (60) |
+| `dte_min` / `dte_target` / `dte_max` | Days-to-expiration range for spread selection |
+| `call_delta_min` / `call_delta_max` | Delta band for call spread leg selection |
+| `put_delta_min` / `put_delta_max` | Delta band for put spread leg selection |
+
+## universe_v1.yaml
+Contains 58 symbols across all 11 GICS sectors. Edit this file to add or remove symbols from the scan universe.
+
+---
+
+# 16. Validation / Quality Commands
 
 ## Run tests
 ```bash
@@ -584,7 +625,7 @@ mypy src
 
 ---
 
-# 16. Git / Release Workflow
+# 17. Git / Release Workflow
 
 ## Inspect repo state
 ```bash
@@ -608,7 +649,7 @@ Use separate commits for:
 
 ---
 
-# 17. Operational Boundaries
+# 18. Operational Boundaries
 
 ## Safe to do now
 - run paper-live daily
@@ -625,18 +666,21 @@ Use separate commits for:
 
 ---
 
-# 18. Recommended Near-Term Priorities
+# 19. Recommended Near-Term Priorities
 
 1. Continue daily paper-live runs
-2. Let IV rank history accumulate
+2. Let IV rank history accumulate (target: 60 observations per symbol)
 3. Watch for `iv_rank_ready_symbols` to become non-empty
-4. Continue multi-run leaderboard/review analysis
-5. Complete remaining quote-quality and production-hardening tasks
-6. Only then re-evaluate strict-live readiness
+4. Wire support/resistance validation into the spread selection pipeline
+5. Wire expected move comparison into trade candidate filtering
+6. Wire regime transition signals into position sizing or entry timing
+7. Continue multi-run leaderboard/review analysis
+8. Complete remaining quote-quality and production-hardening tasks
+9. Only then re-evaluate strict-live readiness
 
 ---
 
-# 19. Quick Command Reference
+# 20. Quick Command Reference
 
 ## Run trade ideas
 ```bash
@@ -677,7 +721,7 @@ mypy src
 
 ---
 
-# 20. Final Operator Guidance
+# 21. Final Operator Guidance
 
 This platform is now best treated as a **paper-live validated signal platform with growing strict-live readiness**, not yet as a fully production-ready auto-trading system.
 
@@ -687,6 +731,3 @@ Use it to:
 - identify repeated winners and repeated failure modes
 - accumulate enough IV history to complete real `iv_rank`
 - harden remaining production controls before any true live deployment
-MD
-```
-

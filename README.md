@@ -21,13 +21,17 @@ This platform combines:
   - `adx14`
 - **volatility context**:
   - live `iv_hv_ratio`
-  - persisted IV proxy history for first-pass `iv_rank`
+  - persisted IV proxy history for first-pass `iv_rank` (60-observation lookback)
 - **decision logic**:
-  - directional state
-  - market regime
-  - IV state
+  - directional state (relaxed classifier with RSI bands 45-75 / 25-55)
+  - market regime (breadth dead zone narrowed to 48-52%)
+  - IV state (asymmetric thresholds — IV_RICH requires 2-of-3 signals, IV_CHEAP requires 1)
   - extension / liquidity / event filters
-- **spread selection**
+- **candidate scoring** (continuous 0-1 scoring using ADX, IV ratio, breadth distance, momentum)
+- **spread selection** with config-driven DTE/delta bands and spread scoring (delta fit, liquidity, efficiency)
+- **support/resistance validation** for strike selection
+- **expected move comparison** (implied vs. forecast edge classification)
+- **regime transition awareness** (transition detection, confidence, direction tracking)
 - **trade idea generation**
 - **paper-live validation logging and review tooling**
 
@@ -40,21 +44,23 @@ This platform combines:
 - real ADX / ATR / moving averages
 - live Polygon options chain normalization
 - real `iv_hv_ratio`
+- 58-symbol universe spanning all 11 GICS sectors
 - watchlist-driven scans
+- continuous candidate scoring and spread-model-based ranking
 - explainable scan artifacts
 - paper-live daily run flow
 - review + leaderboard tooling
 - strict-live blocking when placeholder IV inputs remain
 
 ### Still in progress
-- `iv_rank` becomes fully real only after enough daily IV proxy history accumulates
+- `iv_rank` becomes fully real only after enough daily IV proxy history accumulates (requires 60 observations)
 - broader production hardening tasks remain before unattended live deployment
 
 ### Operational interpretation
 This repo is best treated today as a **paper-live validated signal platform**, not yet a fully production-ready auto-trading system.
 
 For more detail, see:
-- [`RUNBOOK.md`](RUNBOOK.md)
+- [`docs/RUNBOOK.md`](docs/RUNBOOK.md)
 - [`OPERATOR_QUICKSTART.md`](OPERATOR_QUICKSTART.md)
 - [`docs/live_status_summary.md`](docs/live_status_summary.md)
 
@@ -63,12 +69,27 @@ For more detail, see:
 # Repository layout
 
 ## Key docs
-- `RUNBOOK.md`
+- `docs/RUNBOOK.md`
 - `OPERATOR_QUICKSTART.md`
 - `docs/live_status_summary.md`
 - `docs/go_live_phases.md`
 - `docs/watchlist_design.md`
 - `docs/options_watchlist_policy.md`
+
+## Key config
+- `config/strategy_v1.yaml` — strategy parameters (DTE, delta bands, breadth thresholds, IV rank min observations)
+- `config/universe_v1.yaml` — 58-symbol trading universe across all GICS sectors
+
+## Core services
+- `services/feature_normalizer.py` — delegates to canonical classifiers (no duplicate logic)
+- `services/candidate_ranker.py` — continuous scoring with ADX, IV ratio, breadth distance, momentum
+- `services/trade_candidate_ranking.py` — spread-model-based ranking (delta fit, liquidity, efficiency)
+- `services/trade_candidate_orchestrator.py` — config-driven DTE/delta band wiring
+- `services/expiration_aware_spread_selector.py` — config-driven spread selection
+- `services/support_resistance.py` — pivot-point S/R detection and strike validation
+- `services/expected_move.py` — implied vs. forecast expected move edge classification
+- `services/regime_transition.py` — regime transition detection, confidence, direction tracking
+- `services/iv_rank_history.py` — IV rank with 60-observation lookback
 
 ## Key scripts
 - `scripts/run_nightly_scan.py`
@@ -135,7 +156,7 @@ This prints:
 - scan summary
 - rejection reason counts
 - strategy type counts
-- top trade candidates
+- top trade candidates (ranked by spread scoring model)
 - trade ideas if any symbols pass
 
 ## Inspect the latest scan artifact
@@ -168,6 +189,32 @@ PYTHONPATH=src python scripts/paper_live_symbol_leaderboard.py --last-runs 5
 
 ---
 
+# Architecture — v2.1 enhancements
+
+The following improvements were introduced in the v2.1 strategy review:
+
+### Classifier tuning
+- **Breadth dead zone** narrowed from 45-55% to 48-52% — reduces the neutral "no-trade" band
+- **Directional classifier** relaxed — `five_day_return` removed as hard gate, RSI bands widened to 45-75 (bullish) / 25-55 (bearish)
+- **IV state asymmetry** fixed — IV_RICH now requires 2-of-3 confirming signals (was 1-of-3), IV_CHEAP requires only 1
+
+### Scoring and ranking
+- **Continuous candidate scoring** — replaces boolean flags with scaled 0-1 scores using ADX, IV ratio, breadth distance, and momentum
+- **Spread scoring model** — trade ranking uses delta fit, liquidity, and efficiency scores instead of simple credit/width ratio
+
+### New analytical modules
+- **Support/resistance validation** — identifies S/R levels from price data using pivot points, validates candidate strikes against them
+- **Expected move comparison** — compares implied (IV-based) vs. forecast expected move, returns edge classification (sell_premium / buy_premium / neutral)
+- **Regime transition awareness** — detects regime transitions, tracks days in current regime, confidence level, and improving/degrading direction
+
+### Config and infrastructure
+- **Feature normalizer refactored** — delegates to canonical classifiers instead of maintaining duplicate hardcoded logic
+- **Config-driven spread selection** — DTE min/target/max and delta bands read from `strategy_v1.yaml`, no more hardcoded values
+- **IV rank lookback** extended from 20 to 60 observations for more stable readings
+- **Universe expanded** from 19 to 58 symbols covering all 11 GICS sectors
+
+---
+
 # Strict-live behavior
 
 The platform supports a strict-live mode intended to **fail safe** when degraded or placeholder inputs are still in use.
@@ -191,7 +238,7 @@ Strict-live failure should be treated as a safety control, not as a normal runti
   - historical volatility from Databento daily bars using log returns
 
 ## In progress
-- `iv_rank` uses persisted IV proxy history
+- `iv_rank` uses persisted IV proxy history with a 60-observation lookback
 - until enough daily observations accumulate, it may still fall back to placeholder values
 
 IV proxy history is stored in:
@@ -260,7 +307,7 @@ mypy src
 
 # Documentation
 
-- [`RUNBOOK.md`](RUNBOOK.md) — full operational runbook
+- [`docs/RUNBOOK.md`](docs/RUNBOOK.md) — full operational runbook
 - [`OPERATOR_QUICKSTART.md`](OPERATOR_QUICKSTART.md) — short daily operator guide
 - [`docs/live_status_summary.md`](docs/live_status_summary.md) — current platform status
 - [`docs/go_live_phases.md`](docs/go_live_phases.md) — original phased plan
@@ -270,19 +317,11 @@ mypy src
 
 # Suggested next milestones
 
-- complete fully real `iv_rank`
+- complete fully real `iv_rank` (accumulate 60 daily IV proxy observations per symbol)
+- integrate support/resistance validation into the main spread selection pipeline
+- integrate expected move comparison into trade candidate filtering
+- integrate regime transition signals into position sizing or entry timing
 - continue daily paper-live validation
 - add remaining quote-quality diagnostics
 - complete production hardening controls
 - enable strict-live only after placeholder dependencies are eliminated
-
-MD
-```
-
-Then commit it:
-
-```bash
-git add README.md
-git commit -m "docs: add repository README"
-git push origin main
-```
