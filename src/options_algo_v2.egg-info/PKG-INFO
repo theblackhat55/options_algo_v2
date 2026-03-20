@@ -5,3 +5,295 @@ Summary: Production-grade options signal engine
 Requires-Python: >=3.11
 Description-Content-Type: text/markdown
 Requires-Dist: pyyaml>=6.0
+Provides-Extra: live
+Requires-Dist: databento; extra == "live"
+Requires-Dist: python-dotenv; extra == "live"
+
+# options_algo_v2
+
+A watchlist-driven options strategy platform for scanning underlyings, evaluating market/technical/volatility context, selecting spread candidates, and producing explainable trade ideas.
+
+The project is currently designed for **paper-live operation with real market data inputs**, with strict-live controls that intentionally block runs when placeholder or degraded inputs remain.
+
+---
+
+## What this repo does
+
+This platform combines:
+
+- **Databento historical daily bars**
+- **live market breadth / regime context**
+- **Polygon live options chain snapshots**
+- **underlying feature computation**:
+  - `close`
+  - `dma20`
+  - `dma50`
+  - `atr20`
+  - `adx14`
+- **volatility context**:
+  - live `iv_hv_ratio`
+  - persisted IV proxy history for first-pass `iv_rank`
+- **decision logic**:
+  - directional state
+  - market regime
+  - IV state
+  - extension / liquidity / event filters
+- **spread selection**
+- **trade idea generation**
+- **paper-live validation logging and review tooling**
+
+---
+
+## Current status
+
+### Working now
+- live Databento daily bars
+- real ADX / ATR / moving averages
+- live Polygon options chain normalization
+- real `iv_hv_ratio`
+- watchlist-driven scans
+- explainable scan artifacts
+- paper-live daily run flow
+- review + leaderboard tooling
+- strict-live blocking when placeholder IV inputs remain
+
+### Still in progress
+- `iv_rank` becomes fully real only after enough daily IV proxy history accumulates
+- broader production hardening tasks remain before unattended live deployment
+
+### Operational interpretation
+This repo is best treated today as a **paper-live validated signal platform**, not yet a fully production-ready auto-trading system.
+
+For more detail, see:
+- [`RUNBOOK.md`](RUNBOOK.md)
+- [`OPERATOR_QUICKSTART.md`](OPERATOR_QUICKSTART.md)
+- [`docs/live_status_summary.md`](docs/live_status_summary.md)
+
+---
+
+# Repository layout
+
+## Key docs
+- `RUNBOOK.md`
+- `OPERATOR_QUICKSTART.md`
+- `docs/live_status_summary.md`
+- `docs/go_live_phases.md`
+- `docs/watchlist_design.md`
+- `docs/options_watchlist_policy.md`
+
+## Key scripts
+- `scripts/run_nightly_scan.py`
+- `scripts/run_trade_ideas.py`
+- `scripts/run_paper_live_daily.py`
+- `scripts/inspect_scan_debug.py`
+- `scripts/review_paper_live_logs.py`
+- `scripts/paper_live_symbol_leaderboard.py`
+- `scripts/build_watchlist.py`
+- `scripts/filter_options_watchlist.py`
+- `scripts/build_options_watchlist.py`
+
+## Key output directories
+- `data/scan_results/`
+- `data/watchlists/`
+- `data/validation/`
+- `data/state/`
+
+---
+
+# Quick start
+
+## 1) Activate environment
+```bash
+source .venv/bin/activate
+```
+
+## 2) Load environment variables
+```bash
+set -a
+source .env
+set +a
+```
+
+## 3) Run a paper-live scan on a watchlist
+```bash
+PYTHONPATH=src python scripts/run_paper_live_daily.py \
+  --watchlist data/watchlists/<filtered_watchlist>.json
+```
+
+## 4) Review recent runs
+```bash
+PYTHONPATH=src python scripts/review_paper_live_logs.py --last-runs 5
+```
+
+## 5) Review symbol leaderboard
+```bash
+PYTHONPATH=src python scripts/paper_live_symbol_leaderboard.py --last-runs 5
+```
+
+For a shorter operator guide, see [`OPERATOR_QUICKSTART.md`](OPERATOR_QUICKSTART.md).
+
+---
+
+# Example workflows
+
+## Run trade ideas directly
+```bash
+PYTHONPATH=src python scripts/run_trade_ideas.py \
+  --watchlist data/watchlists/<filtered_watchlist>.json
+```
+
+This prints:
+- scan summary
+- rejection reason counts
+- strategy type counts
+- top trade candidates
+- trade ideas if any symbols pass
+
+## Inspect the latest scan artifact
+```bash
+python - <<'PY'
+from pathlib import Path
+files = sorted(Path("data/scan_results").glob("scan_*.json"))
+print(files[-1] if files else "no scan files found")
+PY
+```
+
+Then:
+```bash
+PYTHONPATH=src python scripts/inspect_scan_debug.py data/scan_results/<scan_file>.json
+```
+
+## Run the daily paper-live loop
+```bash
+set -a
+source .env
+set +a
+
+PYTHONPATH=src python scripts/run_paper_live_daily.py \
+  --watchlist data/watchlists/<filtered_watchlist>.json
+
+PYTHONPATH=src python scripts/review_paper_live_logs.py --last-runs 5
+
+PYTHONPATH=src python scripts/paper_live_symbol_leaderboard.py --last-runs 5
+```
+
+---
+
+# Strict-live behavior
+
+The platform supports a strict-live mode intended to **fail safe** when degraded or placeholder inputs are still in use.
+
+Examples of conditions that should block strict-live:
+- placeholder IV rank
+- placeholder IV inputs
+- future stale-data or quote-quality failures
+- mock fallback usage (if disallowed by policy)
+
+This is intentional.  
+Strict-live failure should be treated as a safety control, not as a normal runtime error.
+
+---
+
+# Volatility features
+
+## Real now
+- `iv_hv_ratio` is live
+  - implied-vol proxy from near-ATM Polygon options
+  - historical volatility from Databento daily bars using log returns
+
+## In progress
+- `iv_rank` uses persisted IV proxy history
+- until enough daily observations accumulate, it may still fall back to placeholder values
+
+IV proxy history is stored in:
+```text
+data/state/iv_proxy_history.jsonl
+```
+
+Runtime metadata surfaces:
+- `iv_rank_ready_symbols`
+- `iv_rank_insufficient_history_symbols`
+- `iv_rank_history_path`
+- `iv_rank_trailing_observations`
+
+---
+
+# Validation and review tooling
+
+The repo includes paper-live validation tooling:
+
+## Daily outputs
+- `data/validation/paper_live_runs.jsonl`
+- `data/validation/paper_live_symbol_decisions.jsonl`
+- `data/validation/paper_live_runs.csv`
+
+## Review scripts
+- `scripts/review_paper_live_logs.py`
+- `scripts/paper_live_symbol_leaderboard.py`
+
+These help track:
+- pass rate across runs
+- repeated passing symbols
+- rejection reason distributions
+- directional-state distributions
+- strategy-family mix
+- per-symbol average score / ADX / IV-HV profile
+
+---
+
+# Development / validation
+
+Run before committing changes:
+
+```bash
+pytest
+ruff check .
+mypy src
+```
+
+---
+
+# Current recommended operating posture
+
+## Good uses right now
+- daily paper-live monitoring
+- watchlist-driven scans
+- strategy observation
+- artifact inspection
+- validation logging and leaderboard review
+- IV history accumulation
+
+## Not yet assumed safe
+- unattended strict-live operation
+- small-capital live deployment before remaining hardening is complete
+
+---
+
+# Documentation
+
+- [`RUNBOOK.md`](RUNBOOK.md) — full operational runbook
+- [`OPERATOR_QUICKSTART.md`](OPERATOR_QUICKSTART.md) — short daily operator guide
+- [`docs/live_status_summary.md`](docs/live_status_summary.md) — current platform status
+- [`docs/go_live_phases.md`](docs/go_live_phases.md) — original phased plan
+- [`docs/watchlist_design.md`](docs/watchlist_design.md) — watchlist architecture notes
+
+---
+
+# Suggested next milestones
+
+- complete fully real `iv_rank`
+- continue daily paper-live validation
+- add remaining quote-quality diagnostics
+- complete production hardening controls
+- enable strict-live only after placeholder dependencies are eliminated
+
+MD
+```
+
+Then commit it:
+
+```bash
+git add README.md
+git commit -m "docs: add repository README"
+git push origin main
+```

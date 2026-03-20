@@ -15,7 +15,9 @@ def test_run_trade_ideas_returns_json_path_and_prints_trade_ideas(
     monkeypatch.setenv("OPTIONS_ALGO_RUNTIME_MODE", "mock")
     monkeypatch.delenv("DATABENTO_API_KEY", raising=False)
 
-    output_path = run_trade_ideas()
+    output_path = run_trade_ideas(
+        symbols=["SPY", "QQQ", "IWM", "AAPL", "MSFT", "NVDA", "META", "XLK", "XLF", "XLE"],
+    )
     path = Path(output_path)
 
     assert path.exists()

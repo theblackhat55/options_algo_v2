@@ -1,1 +1,5 @@
 pyyaml>=6.0
+
+[live]
+databento
+python-dotenv

@@ -61,3 +61,31 @@ def test_select_top_trade_candidates_returns_empty_for_non_positive_n() -> None:
     ]
 
     assert select_top_trade_candidates(candidates, top_n=0) == []
+
+
+def test_score_trade_candidate_uses_spread_scoring_when_delta_available() -> None:
+    """When short_delta and short_open_interest are present, use spread scoring model."""
+    candidate = {
+        "symbol": "AAPL",
+        "strategy_family": "BULL_PUT_SPREAD",
+        "short_delta": -0.22,
+        "short_open_interest": 1500,
+        "net_credit": 1.0,
+        "width": 5.0,
+    }
+    score = score_trade_candidate(candidate)
+    # Should use the spread scoring model, returning a value between 0 and 1
+    assert 0.0 < score <= 1.0
+
+
+def test_score_bull_call_spread_with_spread_scoring() -> None:
+    candidate = {
+        "symbol": "AAPL",
+        "strategy_family": "BULL_CALL_SPREAD",
+        "long_delta": 0.55,
+        "long_open_interest": 2000,
+        "net_debit": 2.0,
+        "width": 5.0,
+    }
+    score = score_trade_candidate(candidate)
+    assert 0.0 < score <= 1.0

@@ -1,14 +1,26 @@
 version: universe_v1
-description: Fixed MVP universe for Phase 1 research and candidate generation
+description: Expanded universe across all 11 GICS sectors for improved signal diversity
 
 symbols:
+  # ETFs — broad market
   - SPY
   - QQQ
   - IWM
+  # ETFs — sector
   - XLK
   - XLF
   - XLE
+  - XLV
+  - XLI
+  - XLP
+  - XLY
+  - XLU
+  - XLRE
+  - XLC
   - SMH
+  - GDX
+  - TLT
+  # Technology
   - AAPL
   - MSFT
   - NVDA
@@ -17,7 +29,46 @@ symbols:
   - GOOGL
   - AMD
   - TSLA
+  - CRM
+  - ORCL
+  - AVGO
+  - INTC
+  # Financials
   - JPM
   - BAC
+  - GS
+  - MS
+  - C
+  # Energy
   - XOM
   - CVX
+  - SLB
+  - OXY
+  # Healthcare
+  - JNJ
+  - UNH
+  - PFE
+  - ABBV
+  - LLY
+  - MRK
+  # Industrials
+  - CAT
+  - GE
+  - HON
+  - DE
+  - BA
+  # Consumer
+  - WMT
+  - COST
+  - HD
+  - MCD
+  - PG
+  - KO
+  - NKE
+  - DIS
+  # Communications
+  - NFLX
+  - CMCSA
+  # Utilities / REITs
+  - NEE
+  - SO

@@ -6,8 +6,8 @@ from options_algo_v2.domain.features import MarketRegimeFeatures
 
 def classify_market_regime(
     features: MarketRegimeFeatures,
-    breadth_bullish_threshold: float = 55.0,
-    breadth_bearish_threshold: float = 45.0,
+    breadth_bullish_threshold: float = 52.0,
+    breadth_bearish_threshold: float = 48.0,
 ) -> MarketRegime:
     if features.vix_defensive:
         return MarketRegime.RISK_OFF

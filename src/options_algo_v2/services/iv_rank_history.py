@@ -99,7 +99,7 @@ def compute_iv_rank_from_history(
     *,
     path: Path,
     symbol: str,
-    trailing_observations: int = 20,
+    trailing_observations: int = 60,
 ) -> float | None:
     rows = load_iv_proxy_history(path)
     values = [

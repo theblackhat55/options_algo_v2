@@ -12,7 +12,9 @@ def test_run_nightly_scan_returns_json_path(
     monkeypatch.setenv("OPTIONS_ALGO_RUNTIME_MODE", "mock")
     monkeypatch.delenv("DATABENTO_API_KEY", raising=False)
 
-    output_path = run_nightly_scan()
+    output_path = run_nightly_scan(
+        symbols=["SPY", "QQQ", "IWM", "AAPL", "MSFT", "NVDA", "META", "XLK", "XLF", "XLE"],
+    )
     path = Path(output_path)
 
     assert output_path.endswith(".json")

@@ -12,6 +12,7 @@ def classify_iv_state(
     iv_hv_cheap_max: float = 1.05,
     iv_rv_spread_rich_min: float = 5.0,
     iv_rank_fallback_value: float = 50.0,
+    iv_rich_min_signals: int = 2,
 ) -> IVState:
     iv_rank = features.iv_rank if features.iv_rank is not None else iv_rank_fallback_value
     iv_hv_ratio = features.iv_hv_ratio
@@ -34,10 +35,10 @@ def classify_iv_state(
     if iv_rv_spread is not None and iv_rv_spread >= iv_rv_spread_rich_min:
         rich_signals += 1
 
-    if rich_signals >= 1:
+    if rich_signals >= iv_rich_min_signals:
         return IVState.IV_RICH
 
-    if cheap_signals >= 2:
+    if cheap_signals >= 1:
         return IVState.IV_CHEAP
 
     return IVState.IV_NORMAL

@@ -1,18 +1,20 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
 from options_algo_v2.domain.enums import DirectionalState, IVState, MarketRegime
 from options_algo_v2.domain.evaluation_input import CandidateEvaluationInput
 from options_algo_v2.services.decision_engine import evaluate_candidate_decision
+from options_algo_v2.services.options_chain_provider_factory import _mock_expiration
 from options_algo_v2.services.scan_trade_candidate_builder import (
     build_serialized_trade_candidates,
 )
 
 
 def _make_passed_decision():
+    exp_date = date.fromisoformat(_mock_expiration())
     return evaluate_candidate_decision(
         CandidateEvaluationInput(
             symbol="AAPL",
@@ -20,7 +22,7 @@ def _make_passed_decision():
             directional_state=DirectionalState.BULLISH_CONTINUATION,
             iv_state=IVState.IV_RICH,
             earnings_date=None,
-            planned_latest_exit=date(2026, 4, 17),
+            planned_latest_exit=exp_date,
             underlying_price=150.0,
             avg_daily_volume=5_000_000,
             option_open_interest=2000,
@@ -38,6 +40,7 @@ def _make_passed_decision():
 
 
 def _make_rejected_decision():
+    exp_date = date.fromisoformat(_mock_expiration())
     return evaluate_candidate_decision(
         CandidateEvaluationInput(
             symbol="IWM",
@@ -45,7 +48,7 @@ def _make_rejected_decision():
             directional_state=DirectionalState.NEUTRAL,
             iv_state=IVState.IV_NORMAL,
             earnings_date=None,
-            planned_latest_exit=date(2026, 4, 17),
+            planned_latest_exit=exp_date,
             underlying_price=100.0,
             avg_daily_volume=2_000_000,
             option_open_interest=2000,
@@ -67,9 +70,10 @@ def test_build_serialized_trade_candidates_returns_candidates_in_mock_mode(
 ) -> None:
     monkeypatch.setenv("OPTIONS_ALGO_RUNTIME_MODE", "mock")
 
+    exp = _mock_expiration()
     payloads = build_serialized_trade_candidates(
         decisions=[_make_passed_decision()],
-        expiration="2026-04-17",
+        expiration=exp,
         min_open_interest=900,
         max_bid_ask_spread_width=0.5,
     )
@@ -77,7 +81,7 @@ def test_build_serialized_trade_candidates_returns_candidates_in_mock_mode(
     assert len(payloads) == 1
     assert payloads[0]["symbol"] == "AAPL"
     assert payloads[0]["strategy_family"] == "BULL_PUT_SPREAD"
-    assert payloads[0]["expiration"] == "2026-04-17"
+    assert payloads[0]["expiration"] == exp
 
 
 def test_build_serialized_trade_candidates_skips_rejected_decisions(
@@ -87,7 +91,7 @@ def test_build_serialized_trade_candidates_skips_rejected_decisions(
 
     payloads = build_serialized_trade_candidates(
         decisions=[_make_rejected_decision()],
-        expiration="2026-04-17",
+        expiration=_mock_expiration(),
         min_open_interest=900,
         max_bid_ask_spread_width=0.5,
     )

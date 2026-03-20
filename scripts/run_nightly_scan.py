@@ -42,7 +42,7 @@ from options_algo_v2.services.scan_artifact_orchestrator import (
 )
 from options_algo_v2.services.universe_loader import load_universe_symbols
 
-IV_RANK_TRAILING_OBSERVATIONS = 20
+IV_RANK_TRAILING_OBSERVATIONS = 60
 
 
 def _load_symbols_from_watchlist(path: Path) -> list[str]:

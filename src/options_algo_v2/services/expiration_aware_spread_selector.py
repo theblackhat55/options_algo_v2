@@ -30,9 +30,13 @@ def select_spread_candidates_across_expirations(
     decision: CandidateDecision,
     chain: OptionsChainSnapshot,
     as_of_date: date,
-    min_dte: int = 30,
-    max_dte: int = 60,
-    target_dte: int = 38,
+    min_dte: int = 25,
+    max_dte: int = 45,
+    target_dte: int = 35,
+    credit_short_delta_min: float = 0.15,
+    credit_short_delta_max: float = 0.30,
+    debit_long_delta_min: float = 0.45,
+    debit_long_delta_max: float = 0.65,
 ) -> list[VerticalSpreadCandidate]:
     grouped = group_quotes_by_expiration(chain)
     expirations = list(grouped.keys())
@@ -58,6 +62,10 @@ def select_spread_candidates_across_expirations(
         filtered_quotes = _filter_quotes_for_strategy(
             strategy_family=strategy_family,
             quotes=quotes,
+            credit_short_delta_min=credit_short_delta_min,
+            credit_short_delta_max=credit_short_delta_max,
+            debit_long_delta_min=debit_long_delta_min,
+            debit_long_delta_max=debit_long_delta_max,
         )
 
         filtered_chain = OptionsChainSnapshot(
@@ -89,6 +97,10 @@ def _filter_quotes_for_strategy(
     *,
     strategy_family: str,
     quotes: list[OptionQuote],
+    credit_short_delta_min: float = 0.15,
+    credit_short_delta_max: float = 0.30,
+    debit_long_delta_min: float = 0.45,
+    debit_long_delta_max: float = 0.65,
 ) -> list[OptionQuote]:
     execution_settings = get_runtime_execution_settings()
 
@@ -98,8 +110,8 @@ def _filter_quotes_for_strategy(
         ]
         filtered = filter_quotes_by_delta_band(
             calls,
-            min_abs_delta=0.20,
-            max_abs_delta=0.45,
+            min_abs_delta=debit_long_delta_min,
+            max_abs_delta=debit_long_delta_max,
         )
         if filtered:
             return filtered
@@ -113,8 +125,8 @@ def _filter_quotes_for_strategy(
         ]
         filtered = filter_quotes_by_delta_band(
             puts,
-            min_abs_delta=0.15,
-            max_abs_delta=0.35,
+            min_abs_delta=credit_short_delta_min,
+            max_abs_delta=credit_short_delta_max,
         )
         if filtered:
             return filtered

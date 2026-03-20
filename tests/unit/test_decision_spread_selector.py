@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from options_algo_v2.domain.enums import DirectionalState, IVState, MarketRegime
 from options_algo_v2.domain.evaluation_input import CandidateEvaluationInput
@@ -8,10 +8,13 @@ from options_algo_v2.services.decision_spread_selector import (
 )
 from options_algo_v2.services.options_chain_provider_factory import (
     MockOptionsChainProvider,
+    _mock_expiration,
 )
 
 
 def test_select_spread_candidates_for_bull_call_decision() -> None:
+    exp = _mock_expiration()
+    exp_date = date.fromisoformat(exp)
     decision = evaluate_candidate_decision(
         CandidateEvaluationInput(
             symbol="AAPL",
@@ -19,7 +22,7 @@ def test_select_spread_candidates_for_bull_call_decision() -> None:
             directional_state=DirectionalState.BULLISH_CONTINUATION,
             iv_state=IVState.IV_NORMAL,
             earnings_date=None,
-            planned_latest_exit=date(2026, 4, 17),
+            planned_latest_exit=exp_date,
             underlying_price=150.0,
             avg_daily_volume=5_000_000,
             option_open_interest=2000,
@@ -39,7 +42,7 @@ def test_select_spread_candidates_for_bull_call_decision() -> None:
     spreads = select_spread_candidates_for_decision(
         decision=decision,
         chain=chain,
-        expiration="2026-04-17",
+        expiration=exp,
     )
 
     assert len(spreads) == 1
@@ -47,6 +50,8 @@ def test_select_spread_candidates_for_bull_call_decision() -> None:
 
 
 def test_select_spread_candidates_for_bull_put_decision() -> None:
+    exp = _mock_expiration()
+    exp_date = date.fromisoformat(exp)
     decision = evaluate_candidate_decision(
         CandidateEvaluationInput(
             symbol="AAPL",
@@ -54,7 +59,7 @@ def test_select_spread_candidates_for_bull_put_decision() -> None:
             directional_state=DirectionalState.BULLISH_CONTINUATION,
             iv_state=IVState.IV_RICH,
             earnings_date=None,
-            planned_latest_exit=date(2026, 4, 17),
+            planned_latest_exit=exp_date,
             underlying_price=150.0,
             avg_daily_volume=5_000_000,
             option_open_interest=2000,
@@ -74,7 +79,7 @@ def test_select_spread_candidates_for_bull_put_decision() -> None:
     spreads = select_spread_candidates_for_decision(
         decision=decision,
         chain=chain,
-        expiration="2026-04-17",
+        expiration=exp,
     )
 
     assert len(spreads) == 1

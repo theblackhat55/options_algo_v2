@@ -17,6 +17,7 @@ debit_long_delta_target: 0.55
 debit_long_delta_max: 0.65
 
 iv_rank_lookback_days: 252
+iv_rank_min_observations: 60
 hv_lookback_days: 20
 
 iv_rich_threshold: 60.0
@@ -26,7 +27,7 @@ iv_hv_cheap_ratio: 1.05
 
 adx_trending_min: 18.0
 adx_range_max: 15.0
-breadth_bullish_threshold: 55.0
-breadth_bearish_threshold: 45.0
+breadth_bullish_threshold: 52.0
+breadth_bearish_threshold: 48.0
 
 extension_atr_multiple: 1.5
