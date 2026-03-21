@@ -136,6 +136,67 @@ def _build_decision_trace_by_symbol(
     return result
 
 
+def _enrich_trade_candidates_with_options_context(
+    trade_candidates: list[dict[str, object]],
+    options_context_by_symbol: dict[str, dict[str, object]],
+) -> list[dict[str, object]]:
+    enriched: list[dict[str, object]] = []
+
+    for candidate in trade_candidates:
+        row = dict(candidate)
+        symbol = row.get("symbol")
+        context = (
+            options_context_by_symbol.get(str(symbol), {})
+            if isinstance(symbol, str)
+            else {}
+        )
+
+        row["options_context_available"] = context.get("context_available")
+        row["options_context_confidence_score"] = context.get("confidence_score")
+        row["options_context_regime"] = context.get("options_summary_regime")
+        row["options_context_expected_move_1d_pct"] = context.get("expected_move_1d_pct")
+        row["options_context_expected_move_1w_pct"] = context.get("expected_move_1w_pct")
+        row["options_context_expected_move_30d_pct"] = context.get("expected_move_30d_pct")
+        row["options_context_skew_25d_put_call_ratio"] = context.get(
+            "skew_25d_put_call_ratio"
+        )
+        row["options_context_skew_25d_put_call_spread"] = context.get(
+            "skew_25d_put_call_spread"
+        )
+        row["options_context_pcr_oi"] = context.get("pcr_oi")
+        row["options_context_pcr_volume"] = context.get("pcr_volume")
+        enriched.append(row)
+
+    return enriched
+
+
+def _summarize_options_context_decision_debug(
+    debug_by_symbol: dict[str, dict[str, object]],
+) -> dict[str, object]:
+    adjusted_symbol_count = 0
+    hard_reject_count = 0
+    reason_counts: dict[str, int] = {}
+
+    for item in debug_by_symbol.values():
+        if not isinstance(item, dict):
+            continue
+        adjusted_symbol_count += 1
+        if item.get("hard_reject"):
+            hard_reject_count += 1
+
+        reasons = item.get("applied_reason_codes", [])
+        if isinstance(reasons, list):
+            for reason in reasons:
+                key = str(reason)
+                reason_counts[key] = reason_counts.get(key, 0) + 1
+
+    return {
+        "options_context_decision_adjusted_symbol_count": adjusted_symbol_count,
+        "options_context_hard_reject_count": hard_reject_count,
+        "options_context_applied_reason_counts": reason_counts,
+    }
+
+
 def build_scan_summary(decisions: list[CandidateDecision]) -> ScanSummary:
     passed_symbols = [d.candidate.symbol for d in decisions if d.final_passed]
     rejected_symbols = [d.candidate.symbol for d in decisions if not d.final_passed]
@@ -197,6 +258,14 @@ def build_scan_result(
         else 0.5,
         as_of_date=execution_settings.as_of_date,
     )
+
+    degraded_metadata = degraded_metadata or {}
+    options_context_by_symbol = degraded_metadata.get("options_context_by_symbol", {})
+    if isinstance(options_context_by_symbol, dict):
+        trade_candidates = _enrich_trade_candidates_with_options_context(
+            trade_candidates,
+            options_context_by_symbol,
+        )
     ranked_trade_candidates = rank_trade_candidates(trade_candidates)
     top_trade_candidates = select_top_trade_candidates(
         ranked_trade_candidates,
@@ -213,6 +282,17 @@ def build_scan_result(
             decisions=serialized_decisions,
         )
     ]
+
+    options_context_decision_debug_by_symbol = degraded_metadata.get(
+        "options_context_decision_debug_by_symbol",
+        {},
+    ) if degraded_metadata else {}
+
+    options_context_decision_summary = (
+        _summarize_options_context_decision_debug(options_context_decision_debug_by_symbol)
+        if isinstance(options_context_decision_debug_by_symbol, dict)
+        else {}
+    )
 
     runtime_metadata: dict[str, object] = {
         "feature_debug_by_symbol": _build_feature_debug_by_symbol(feature_sources),
@@ -271,6 +351,8 @@ def build_scan_result(
         ),
         "top_trade_summary_rows": top_trade_summary_rows,
     }
+
+    runtime_metadata.update(options_context_decision_summary)
 
     if degraded_metadata:
         runtime_metadata.update(degraded_metadata)
