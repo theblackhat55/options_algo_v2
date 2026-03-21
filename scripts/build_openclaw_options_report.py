@@ -61,8 +61,8 @@ def main() -> int:
     latest_scan_path, latest_scan = _load_latest_scan(scan_dir)
     latest_run = _load_last_jsonl_row(validation_dir / "paper_live_runs.jsonl")
 
-    runtime_metadata = {}
-    summary = {}
+    runtime_metadata: dict[str, Any] = {}
+    summary: dict[str, Any] = {}
 
     if isinstance(latest_scan, dict):
         runtime_metadata = latest_scan.get("runtime_metadata", {}) or {}
@@ -87,6 +87,13 @@ def main() -> int:
         "top_rejection_reasons": {},
         "iv_rank_ready_symbols": [],
         "iv_rank_insufficient_history_symbols": [],
+        "options_context_matched_count": None,
+        "options_context_missing_count": None,
+        "options_context_missing_symbols": [],
+        "options_context_regime_counts": {},
+        "options_context_low_confidence_symbols": [],
+        "options_context_top_expected_move_symbols": [],
+        "options_context_top_skew_symbols": [],
     }
 
     if isinstance(latest_run, dict):
@@ -107,6 +114,32 @@ def main() -> int:
         report["iv_rank_ready_symbols"] = runtime_metadata.get("iv_rank_ready_symbols", [])
         report["iv_rank_insufficient_history_symbols"] = runtime_metadata.get(
             "iv_rank_insufficient_history_symbols",
+            [],
+        )
+        report["options_context_matched_count"] = runtime_metadata.get(
+            "options_context_matched_count"
+        )
+        report["options_context_missing_count"] = runtime_metadata.get(
+            "options_context_missing_count"
+        )
+        report["options_context_missing_symbols"] = runtime_metadata.get(
+            "options_context_missing_symbols",
+            [],
+        )
+        report["options_context_regime_counts"] = runtime_metadata.get(
+            "options_context_regime_counts",
+            {},
+        )
+        report["options_context_low_confidence_symbols"] = runtime_metadata.get(
+            "options_context_low_confidence_symbols",
+            [],
+        )
+        report["options_context_top_expected_move_symbols"] = runtime_metadata.get(
+            "options_context_top_expected_move_symbols",
+            [],
+        )
+        report["options_context_top_skew_symbols"] = runtime_metadata.get(
+            "options_context_top_skew_symbols",
             [],
         )
 

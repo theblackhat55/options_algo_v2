@@ -33,6 +33,14 @@ from options_algo_v2.services.market_breadth_provider_factory import (
 from options_algo_v2.services.options_chain_provider_factory import (
     build_options_chain_provider,
 )
+from options_algo_v2.services.options_context_integration import (
+    build_options_context_by_symbol,
+    summarize_options_context_coverage,
+)
+from options_algo_v2.services.options_context_loader import (
+    build_options_context_index,
+    load_options_context_payload,
+)
 from options_algo_v2.services.runtime_execution_settings import (
     get_runtime_execution_settings,
 )
@@ -619,6 +627,17 @@ def run_nightly_scan(
     breadth_provider = build_market_breadth_provider()
     options_chain_provider = build_options_chain_provider()
 
+    options_context_payload = load_options_context_payload()
+    options_context_index = build_options_context_index(options_context_payload)
+    options_context_by_symbol = build_options_context_by_symbol(
+        selected_symbols,
+        options_context_index,
+    )
+    options_context_summary = summarize_options_context_coverage(
+        selected_symbols,
+        options_context_index,
+    )
+
     raw_features = []
     historical_provider_modes: dict[str, str] = {}
     breadth_override_symbols: list[str] = []
@@ -739,7 +758,12 @@ def run_nightly_scan(
             "quote_quality_by_symbol": quote_quality_by_symbol,
             "aggregate_quote_quality_counts": aggregate_quote_quality_counts,
             "liquidity_debug_by_symbol": liquidity_debug_by_symbol,
+            "options_context_source_watchlist": options_context_payload.get("source_watchlist"),
+            "options_context_generated_at_utc": options_context_payload.get("generated_at_utc"),
+            "options_context_run_id": options_context_payload.get("run_id"),
+            "options_context_by_symbol": options_context_by_symbol,
             "degraded_live_mode": degraded_live_mode,
+            **options_context_summary,
         },
     )
     output_path = artifact_result.output_path
@@ -813,6 +837,23 @@ def run_nightly_scan(
     print(f"strategy_type_counts={summary['strategy_type_counts']}")
     print(f"historical_provider_modes={historical_provider_modes}")
     print(f"breadth_override_symbols={breadth_override_symbols}")
+    print(
+        "options_context_coverage="
+        f"matched={runtime_metadata.get('options_context_matched_count')},"
+        f"missing={runtime_metadata.get('options_context_missing_count')}"
+    )
+    print(
+        "options_context_regime_counts="
+        f"{runtime_metadata.get('options_context_regime_counts', {})}"
+    )
+    print(
+        "options_context_top_expected_move_symbols="
+        f"{runtime_metadata.get('options_context_top_expected_move_symbols', [])}"
+    )
+    print(
+        "options_context_top_skew_symbols="
+        f"{runtime_metadata.get('options_context_top_skew_symbols', [])}"
+    )
     print(
         "top_trade_candidate_symbols="
         f"{runtime_metadata.get('top_trade_candidate_symbols', [])}"

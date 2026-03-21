@@ -117,6 +117,18 @@ def build_run_summary_row(payload: dict[str, Any]) -> dict[str, Any]:
             "top_trade_candidate_symbols", []
         ),
         "trade_idea_symbols": runtime_metadata.get("trade_idea_symbols", []),
+        "options_context_matched_count": runtime_metadata.get("options_context_matched_count"),
+        "options_context_missing_count": runtime_metadata.get("options_context_missing_count"),
+        "options_context_regime_counts": runtime_metadata.get("options_context_regime_counts", {}),
+        "options_context_low_confidence_symbols": runtime_metadata.get(
+            "options_context_low_confidence_symbols", []
+        ),
+        "options_context_top_expected_move_symbols": runtime_metadata.get(
+            "options_context_top_expected_move_symbols", []
+        ),
+        "options_context_top_skew_symbols": runtime_metadata.get(
+            "options_context_top_skew_symbols", []
+        ),
         "rejection_reason_counts": summary.get("rejection_reason_counts", {}),
         "signal_state_counts": summary.get("signal_state_counts", {}),
         "strategy_type_counts": summary.get("strategy_type_counts", {}),
@@ -127,6 +139,7 @@ def build_symbol_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
     runtime_metadata = payload.get("runtime_metadata", {})
     feature_debug = runtime_metadata.get("feature_debug_by_symbol", {})
     decision_trace = runtime_metadata.get("decision_trace_by_symbol", {})
+    options_context_by_symbol = runtime_metadata.get("options_context_by_symbol", {})
 
     rows: list[dict[str, Any]] = []
     for decision in payload.get("decisions", []):
@@ -139,6 +152,7 @@ def build_symbol_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
         feature_row = feature_debug.get(symbol, {})
         trace_row = decision_trace.get(symbol, {})
+        options_context_row = options_context_by_symbol.get(symbol, {})
 
         row = {
             "timestamp_utc": _utc_timestamp(),
@@ -175,6 +189,34 @@ def build_symbol_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
             "historical_row_provider": feature_row.get("historical_row_provider"),
             "market_breadth_provider": feature_row.get("market_breadth_provider"),
             "trace_strategy_family": trace_row.get("strategy_family"),
+            "options_context_available": options_context_row.get("context_available"),
+            "options_context_source_provider": options_context_row.get("source_provider"),
+            "options_context_as_of_utc": options_context_row.get("as_of_utc"),
+            "options_contract_count": options_context_row.get("contract_count"),
+            "options_expiration_count": options_context_row.get("expiration_count"),
+            "options_pcr_oi": options_context_row.get("pcr_oi"),
+            "options_pcr_volume": options_context_row.get("pcr_volume"),
+            "options_atm_iv": options_context_row.get("atm_iv"),
+            "options_expected_move_1d_pct": options_context_row.get("expected_move_1d_pct"),
+            "options_expected_move_1w_pct": options_context_row.get("expected_move_1w_pct"),
+            "options_expected_move_30d_pct": options_context_row.get("expected_move_30d_pct"),
+            "options_skew_25d_put_call_ratio": options_context_row.get(
+                "skew_25d_put_call_ratio"
+            ),
+            "options_skew_25d_put_call_spread": options_context_row.get(
+                "skew_25d_put_call_spread"
+            ),
+            "options_nonzero_bid_ask_ratio": options_context_row.get(
+                "nonzero_bid_ask_ratio"
+            ),
+            "options_nonzero_open_interest_ratio": options_context_row.get(
+                "nonzero_open_interest_ratio"
+            ),
+            "options_nonzero_delta_ratio": options_context_row.get("nonzero_delta_ratio"),
+            "options_nonzero_iv_ratio": options_context_row.get("nonzero_iv_ratio"),
+            "options_summary_regime": options_context_row.get("options_summary_regime"),
+            "options_confidence_score": options_context_row.get("confidence_score"),
+            "options_context_reason_codes": options_context_row.get("reason_codes", []),
         }
         rows.append(row)
 
@@ -227,6 +269,18 @@ def append_paper_live_logs(
             run_row["top_trade_candidate_symbols"]
         ),
         "trade_idea_symbols": _json_list(run_row["trade_idea_symbols"]),
+        "options_context_matched_count": run_row["options_context_matched_count"],
+        "options_context_missing_count": run_row["options_context_missing_count"],
+        "options_context_regime_counts": _json_dict(run_row["options_context_regime_counts"]),
+        "options_context_low_confidence_symbols": _json_list(
+            run_row["options_context_low_confidence_symbols"]
+        ),
+        "options_context_top_expected_move_symbols": _json_list(
+            run_row["options_context_top_expected_move_symbols"]
+        ),
+        "options_context_top_skew_symbols": _json_list(
+            run_row["options_context_top_skew_symbols"]
+        ),
         "rejection_reason_counts": _json_dict(run_row["rejection_reason_counts"]),
         "signal_state_counts": _json_dict(run_row["signal_state_counts"]),
         "strategy_type_counts": _json_dict(run_row["strategy_type_counts"]),
@@ -252,6 +306,12 @@ def append_paper_live_logs(
             "rejected_symbols",
             "top_trade_candidate_symbols",
             "trade_idea_symbols",
+            "options_context_matched_count",
+            "options_context_missing_count",
+            "options_context_regime_counts",
+            "options_context_low_confidence_symbols",
+            "options_context_top_expected_move_symbols",
+            "options_context_top_skew_symbols",
             "rejection_reason_counts",
             "signal_state_counts",
             "strategy_type_counts",
