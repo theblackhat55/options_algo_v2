@@ -63,5 +63,12 @@ def serialize_candidate_decision(
         "iv_rank": decision.iv_rank,
         "iv_hv_ratio": decision.iv_hv_ratio,
         "market_breadth_pct_above_20dma": decision.market_breadth_pct_above_20dma,
+        "rsi14": decision.rsi14,
+        "five_day_return": decision.five_day_return,
+        "breakout_above_20d_high": decision.breakout_above_20d_high,
+        "breakdown_below_20d_low": decision.breakdown_below_20d_low,
+        "breakout_volume_multiple": decision.breakout_volume_multiple,
+        "extended_up": decision.extended_up,
+        "extended_down": decision.extended_down,
         "directional_checks": _directional_checks(decision),
     }

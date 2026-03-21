@@ -47,4 +47,9 @@ def build_raw_feature_input(
         earnings_date=earnings_date,
         entry_date=entry_date,
         dte_days=dte_days,
+        rsi14=computed_features.rsi14,
+        five_day_return=computed_features.five_day_return,
+        breakout_above_20d_high=computed_features.breakout_above_20d_high,
+        breakdown_below_20d_low=computed_features.breakdown_below_20d_low,
+        breakout_volume_multiple=computed_features.breakout_volume_multiple,
     )

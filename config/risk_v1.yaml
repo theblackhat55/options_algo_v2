@@ -2,8 +2,8 @@ version: risk_v1
 
 min_underlying_price: 20.0
 min_avg_daily_volume: 1000000
-min_option_open_interest: 500
-min_option_volume: 100
+min_option_open_interest: 250
+min_option_volume: 50
 
 max_bid_ask_spread_pct: 0.08
 max_option_quote_age_seconds: 60

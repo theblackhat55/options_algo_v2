@@ -31,3 +31,8 @@ class CandidateEvaluationInput:
     iv_rank: float = 45.0
     iv_hv_ratio: float = 1.10
     market_breadth_pct_above_20dma: float = 50.0
+    rsi14: float | None = None
+    five_day_return: float | None = None
+    breakout_above_20d_high: bool | None = None
+    breakdown_below_20d_low: bool | None = None
+    breakout_volume_multiple: float | None = None

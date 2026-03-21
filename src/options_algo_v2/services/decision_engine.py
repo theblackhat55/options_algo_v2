@@ -98,6 +98,15 @@ def evaluate_candidate_decision(
         and final_score >= min_score_required
     )
 
+    extended_up = (
+        evaluation_input.close > evaluation_input.dma20
+        and (evaluation_input.close - evaluation_input.dma20) > (1.75 * evaluation_input.atr20)
+    )
+    extended_down = (
+        evaluation_input.close < evaluation_input.dma20
+        and (evaluation_input.dma20 - evaluation_input.close) > (1.75 * evaluation_input.atr20)
+    )
+
     return CandidateDecision(
         candidate=candidate,
         event_result=event_result,
@@ -114,5 +123,12 @@ def evaluate_candidate_decision(
         iv_rank=evaluation_input.iv_rank,
         iv_hv_ratio=evaluation_input.iv_hv_ratio,
         market_breadth_pct_above_20dma=evaluation_input.market_breadth_pct_above_20dma,
+        rsi14=getattr(evaluation_input, "rsi14", None),
+        five_day_return=getattr(evaluation_input, "five_day_return", None),
+        breakout_above_20d_high=getattr(evaluation_input, "breakout_above_20d_high", None),
+        breakdown_below_20d_low=getattr(evaluation_input, "breakdown_below_20d_low", None),
+        breakout_volume_multiple=getattr(evaluation_input, "breakout_volume_multiple", None),
+        extended_up=extended_up,
+        extended_down=extended_down,
         rejection_reasons=rejection_reasons,
     )

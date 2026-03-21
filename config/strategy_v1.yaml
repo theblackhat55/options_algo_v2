@@ -30,4 +30,4 @@ adx_range_max: 15.0
 breadth_bullish_threshold: 52.0
 breadth_bearish_threshold: 48.0
 
-extension_atr_multiple: 1.5
+extension_atr_multiple: 2.0

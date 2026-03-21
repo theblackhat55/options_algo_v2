@@ -33,6 +33,11 @@ def payload_to_evaluation_input(
         iv_hv_ratio=payload.iv_hv_ratio,
         market_breadth_pct_above_20dma=payload.market_breadth_pct_above_20dma,
         expected_move_fit=payload.expected_move_fit,
+        rsi14=payload.rsi14,
+        five_day_return=payload.five_day_return,
+        breakout_above_20d_high=payload.breakout_above_20d_high,
+        breakdown_below_20d_low=payload.breakdown_below_20d_low,
+        breakout_volume_multiple=payload.breakout_volume_multiple,
     )
 
 

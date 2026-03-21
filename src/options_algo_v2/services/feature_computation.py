@@ -116,6 +116,67 @@ def compute_adx14(bars: list[BarData]) -> float:
     return adx
 
 
+def compute_rsi14(bars: list[BarData]) -> float | None:
+    if len(bars) < 15:
+        return None
+
+    closes = [bar.close for bar in bars]
+    gains: list[float] = []
+    losses: list[float] = []
+
+    for index in range(len(closes) - 14, len(closes)):
+        delta = closes[index] - closes[index - 1]
+        gains.append(max(delta, 0.0))
+        losses.append(max(-delta, 0.0))
+
+    avg_gain = sum(gains) / 14.0
+    avg_loss = sum(losses) / 14.0
+
+    if avg_loss == 0.0:
+        return 100.0 if avg_gain > 0.0 else 50.0
+
+    rs = avg_gain / avg_loss
+    return 100.0 - (100.0 / (1.0 + rs))
+
+
+def compute_five_day_return(bars: list[BarData]) -> float | None:
+    if len(bars) < 6:
+        return None
+
+    start_close = bars[-6].close
+    end_close = bars[-1].close
+    if start_close == 0.0:
+        return None
+    return (end_close - start_close) / start_close
+
+
+def compute_breakout_above_20d_high(bars: list[BarData]) -> bool:
+    if len(bars) < 21:
+        return False
+    latest_close = bars[-1].close
+    prior_20d_high = max(bar.high for bar in bars[-21:-1])
+    return latest_close > prior_20d_high
+
+
+def compute_breakdown_below_20d_low(bars: list[BarData]) -> bool:
+    if len(bars) < 21:
+        return False
+    latest_close = bars[-1].close
+    prior_20d_low = min(bar.low for bar in bars[-21:-1])
+    return latest_close < prior_20d_low
+
+
+def compute_breakout_volume_multiple(bars: list[BarData]) -> float:
+    if len(bars) < 21:
+        return 1.0
+    latest_volume = float(bars[-1].volume)
+    prior_volumes = [float(bar.volume) for bar in bars[-21:-1]]
+    avg_volume = sum(prior_volumes) / len(prior_volumes)
+    if avg_volume <= 0.0:
+        return 1.0
+    return latest_volume / avg_volume
+
+
 def compute_underlying_features(
     bars: list[BarData],
 ) -> ComputedUnderlyingFeatures:
@@ -131,4 +192,9 @@ def compute_underlying_features(
         dma50=compute_sma(closes, 50),
         atr20=compute_atr20(bars),
         adx14=compute_adx14(bars),
+        rsi14=compute_rsi14(bars),
+        five_day_return=compute_five_day_return(bars),
+        breakout_above_20d_high=compute_breakout_above_20d_high(bars),
+        breakdown_below_20d_low=compute_breakdown_below_20d_low(bars),
+        breakout_volume_multiple=compute_breakout_volume_multiple(bars),
     )

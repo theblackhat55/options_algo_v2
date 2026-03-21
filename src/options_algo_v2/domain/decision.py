@@ -23,4 +23,11 @@ class CandidateDecision:
     iv_rank: float | None = None
     iv_hv_ratio: float | None = None
     market_breadth_pct_above_20dma: float | None = None
+    rsi14: float | None = None
+    five_day_return: float | None = None
+    breakout_above_20d_high: bool | None = None
+    breakdown_below_20d_low: bool | None = None
+    breakout_volume_multiple: float | None = None
+    extended_up: bool | None = None
+    extended_down: bool | None = None
     rejection_reasons: list[str] = field(default_factory=list)

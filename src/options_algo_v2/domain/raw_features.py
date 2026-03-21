@@ -25,3 +25,8 @@ class RawFeatureInput:
     earnings_date: date | None
     entry_date: date
     dte_days: int
+    rsi14: float | None = None
+    five_day_return: float | None = None
+    breakout_above_20d_high: bool = False
+    breakdown_below_20d_low: bool = False
+    breakout_volume_multiple: float = 1.0
