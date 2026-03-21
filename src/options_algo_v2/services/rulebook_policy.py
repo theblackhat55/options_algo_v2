@@ -11,10 +11,15 @@ def regime_allows_strategy(
 ) -> bool:
     if regime in {
         MarketRegime.RISK_OFF,
-        MarketRegime.RANGE_UNCLEAR,
         MarketRegime.SYSTEM_DEGRADED,
     }:
         return False
+
+    if regime == MarketRegime.RANGE_UNCLEAR:
+        return strategy_type in {
+            StrategyType.BULL_PUT_SPREAD,
+            StrategyType.BEAR_CALL_SPREAD,
+        }
 
     if regime == MarketRegime.TREND_UP:
         return strategy_type in {

@@ -18,13 +18,14 @@ def _reject_candidate(
     directional_state: DirectionalState,
     iv_state: IVState,
     reason: str,
+    strategy_type: StrategyType | None = None,
 ) -> StrategyCandidate:
     return StrategyCandidate(
         symbol=symbol,
         market_regime=market_regime,
         directional_state=directional_state,
         iv_state=iv_state,
-        strategy_type=StrategyType.BULL_CALL_SPREAD,
+        strategy_type=strategy_type or StrategyType.BULL_CALL_SPREAD,
         signal_state=SignalState.REJECTED,
         score=0.0,
         rationale=[reason],
@@ -39,7 +40,6 @@ def select_strategy_candidate(
     iv_state: IVState,
 ) -> StrategyCandidate:
     if market_regime in {
-        MarketRegime.RANGE_UNCLEAR,
         MarketRegime.RISK_OFF,
         MarketRegime.SYSTEM_DEGRADED,
     }:
@@ -97,6 +97,7 @@ def select_strategy_candidate(
             directional_state=directional_state,
             iv_state=iv_state,
             reason="strategy not permitted in current regime",
+            strategy_type=strategy_type,
         )
 
     rationale = [
@@ -105,6 +106,9 @@ def select_strategy_candidate(
         f"iv_state={iv_state.value}",
         f"selected_strategy={strategy_type.value}",
     ]
+
+    if market_regime == MarketRegime.RANGE_UNCLEAR:
+        rationale.append("range_unclear_allowed_for_defined_risk_spread")
 
     return StrategyCandidate(
         symbol=symbol,
