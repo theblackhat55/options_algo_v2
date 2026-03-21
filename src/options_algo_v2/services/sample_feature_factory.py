@@ -60,4 +60,6 @@ def build_sample_raw_features_from_snapshot(
         earnings_date=None,
         entry_date=date(2026, 3, 10),
         dte_days=35,
+        rsi14=50.0,
+        five_day_return=0.0,
     )
