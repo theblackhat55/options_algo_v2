@@ -236,6 +236,9 @@ def build_symbol_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
             "options_context_reason_codes": options_context_decision_debug_row.get(
                 "applied_reason_codes", []
             ),
+            "options_context_advisory_reason_codes": options_context_decision_debug_row.get(
+                "advisory_reason_codes", []
+            ),
             "options_context_score_delta": options_context_decision_debug_row.get(
                 "score_delta"
             ),

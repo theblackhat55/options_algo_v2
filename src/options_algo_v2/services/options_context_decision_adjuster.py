@@ -22,9 +22,14 @@ def _to_float(value: object) -> float | None:
         return None
 
 
-def _build_adjustment(context_row: dict[str, Any] | None) -> tuple[float, list[str], bool]:
+def _build_adjustment(context_row: dict[str, Any] | None) -> tuple[
+    float,
+    list[str],
+    bool,
+    list[str],
+]:
     if not isinstance(context_row, dict) or not context_row.get("context_available"):
-        return -8.0, ["options_context_missing"], True
+        return -8.0, ["options_context_missing"], True, ["options_context_missing"]
 
     confidence = _to_float(context_row.get("confidence_score")) or 0.0
     regime = str(context_row.get("options_summary_regime") or "").strip().lower()
@@ -38,6 +43,7 @@ def _build_adjustment(context_row: dict[str, Any] | None) -> tuple[float, list[s
 
     score_delta = 0.0
     reasons: list[str] = []
+    advisory_reasons: list[str] = []
     hard_reject = False
 
     if confidence < 0.50:
@@ -68,23 +74,36 @@ def _build_adjustment(context_row: dict[str, Any] | None) -> tuple[float, list[s
         score_delta -= 4.0
         reasons.append("expected_move_too_small")
 
-    if pcr_oi is not None and pcr_oi >= 1.75:
-        score_delta -= 3.0
-        reasons.append("pcr_oi_extreme_put_heavy")
-    elif pcr_oi is not None and pcr_oi <= 0.55:
-        score_delta -= 2.0
-        reasons.append("pcr_oi_extreme_call_heavy")
+    if pcr_oi is not None:
+        if pcr_oi >= 3.50:
+            score_delta -= 3.0
+            reasons.append("pcr_oi_extreme_put_heavy")
+        elif pcr_oi >= 2.25:
+            advisory_reasons.append("pcr_oi_put_heavy_advisory")
+        elif pcr_oi <= 0.35:
+            score_delta -= 2.0
+            reasons.append("pcr_oi_extreme_call_heavy")
+        elif pcr_oi <= 0.45:
+            advisory_reasons.append("pcr_oi_call_heavy_advisory")
 
-    if pcr_volume is not None and pcr_volume >= 1.90:
-        score_delta -= 2.0
-        reasons.append("pcr_volume_extreme_put_heavy")
-    elif pcr_volume is not None and pcr_volume <= 0.55:
-        score_delta -= 1.0
-        reasons.append("pcr_volume_extreme_call_heavy")
+    if pcr_volume is not None:
+        if pcr_volume >= 2.75:
+            score_delta -= 2.0
+            reasons.append("pcr_volume_extreme_put_heavy")
+        elif pcr_volume >= 2.0:
+            advisory_reasons.append("pcr_volume_put_heavy_advisory")
+        elif pcr_volume <= 0.35:
+            score_delta -= 1.0
+            reasons.append("pcr_volume_extreme_call_heavy")
+        elif pcr_volume <= 0.45:
+            advisory_reasons.append("pcr_volume_call_heavy_advisory")
 
-    if skew_ratio is not None and skew_ratio >= 1.20:
-        score_delta -= 2.0
-        reasons.append("extreme_put_skew")
+    if skew_ratio is not None:
+        if skew_ratio >= 2.25:
+            score_delta -= 2.0
+            reasons.append("extreme_put_skew")
+        elif skew_ratio >= 1.50:
+            advisory_reasons.append("put_skew_advisory")
 
     if bid_ask_ratio < 0.80:
         score_delta -= 3.0
@@ -102,7 +121,7 @@ def _build_adjustment(context_row: dict[str, Any] | None) -> tuple[float, list[s
         hard_reject = True
         reasons.append("options_context_untradable")
 
-    return score_delta, reasons, hard_reject
+    return score_delta, reasons, hard_reject, advisory_reasons
 
 
 def apply_options_context_to_decisions(
@@ -116,7 +135,9 @@ def apply_options_context_to_decisions(
     for decision in decisions:
         symbol = decision.candidate.symbol
         context_row = options_context_by_symbol.get(symbol, {})
-        score_delta, extra_reasons, hard_reject = _build_adjustment(context_row)
+        score_delta, extra_reasons, hard_reject, advisory_reasons = _build_adjustment(
+            context_row
+        )
 
         new_final_score = round(float(decision.final_score) + float(score_delta), 3)
         if new_final_score < 0.0:
@@ -149,6 +170,7 @@ def apply_options_context_to_decisions(
             "score_delta": round(score_delta, 3),
             "hard_reject": hard_reject,
             "applied_reason_codes": extra_reasons,
+            "advisory_reason_codes": advisory_reasons,
             "final_score_after_context": new_final_score,
             "final_passed_after_context": final_passed,
             "options_summary_regime": context_row.get("options_summary_regime"),

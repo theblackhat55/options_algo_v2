@@ -272,6 +272,7 @@ def main() -> int:
     symbol_rejection_counter: Counter[str] = Counter()
     options_summary_regime_counter: Counter[str] = Counter()
     options_context_reason_counter: Counter[str] = Counter()
+    options_context_advisory_reason_counter: Counter[str] = Counter()
     options_penalized_symbol_counter: Counter[str] = Counter()
     confidence_by_symbol: dict[str, list[float]] = defaultdict(list)
 
@@ -316,6 +317,12 @@ def main() -> int:
                 if isinstance(reason, str):
                     options_context_reason_counter[reason] += 1
 
+        advisory_reason_codes = row.get("options_context_advisory_reason_codes", [])
+        if isinstance(advisory_reason_codes, list):
+            for reason in advisory_reason_codes:
+                if isinstance(reason, str):
+                    options_context_advisory_reason_counter[reason] += 1
+
     avg_confidence_rows: list[tuple[str, float]] = []
     for symbol, values in confidence_by_symbol.items():
         avg_value = _avg(values)
@@ -332,6 +339,9 @@ def main() -> int:
     print(f"  symbol_rejection_reasons={_fmt_top(symbol_rejection_counter)}")
     print(f"  options_summary_regimes={_fmt_top(options_summary_regime_counter)}")
     print(f"  options_context_reason_codes={_fmt_top(options_context_reason_counter)}")
+    print(
+        f"  options_context_advisory_reason_codes={_fmt_top(options_context_advisory_reason_counter)}"
+    )
     print(f"  options_penalized_symbols={_fmt_top(options_penalized_symbol_counter)}")
     print(f"  avg_options_confidence_by_symbol={avg_confidence_rows[:10]}")
 
