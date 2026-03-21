@@ -19,6 +19,7 @@ def regime_allows_strategy(
         return strategy_type in {
             StrategyType.BULL_PUT_SPREAD,
             StrategyType.BEAR_CALL_SPREAD,
+            StrategyType.BEAR_PUT_SPREAD,
         }
 
     if regime == MarketRegime.TREND_UP:
