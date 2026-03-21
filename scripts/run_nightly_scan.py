@@ -41,6 +41,9 @@ from options_algo_v2.services.options_context_loader import (
     build_options_context_index,
     load_options_context_payload,
 )
+from options_algo_v2.services.options_context_decision_adjuster import (
+    apply_options_context_to_decisions,
+)
 from options_algo_v2.services.runtime_execution_settings import (
     get_runtime_execution_settings,
 )
@@ -730,6 +733,10 @@ def run_nightly_scan(
     history_path = default_iv_rank_history_path()
 
     decisions = evaluate_raw_feature_batch(raw_features)
+    decisions, options_context_decision_debug = apply_options_context_to_decisions(
+        decisions,
+        options_context_by_symbol=options_context_by_symbol,
+    )
     artifact_result = build_and_write_scan_artifact(
         decisions=decisions,
         degraded_metadata={
@@ -762,6 +769,7 @@ def run_nightly_scan(
             "options_context_generated_at_utc": options_context_payload.get("generated_at_utc"),
             "options_context_run_id": options_context_payload.get("run_id"),
             "options_context_by_symbol": options_context_by_symbol,
+            "options_context_decision_debug_by_symbol": options_context_decision_debug,
             "degraded_live_mode": degraded_live_mode,
             **options_context_summary,
         },
@@ -833,6 +841,10 @@ def run_nightly_scan(
         f"rejected={summary['total_rejected']}"
     )
     print(f"rejection_reason_counts={summary['rejection_reason_counts']}")
+    print(
+        "options_context_decision_debug_sample="
+        f"{next(iter(runtime_metadata.get('options_context_decision_debug_by_symbol', {}).items()), None)}"
+    )
     print(f"signal_state_counts={summary['signal_state_counts']}")
     print(f"strategy_type_counts={summary['strategy_type_counts']}")
     print(f"historical_provider_modes={historical_provider_modes}")

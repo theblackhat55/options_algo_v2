@@ -8,6 +8,57 @@ from options_algo_v2.services.spread_scoring import (
 )
 
 
+def _to_float(value: object) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        text = str(value).strip()
+        if not text:
+            return None
+        return float(text)
+    except Exception:
+        return None
+
+
+def _options_context_ranking_adjustment(candidate: dict[str, object]) -> float:
+    score = 0.0
+
+    confidence = _to_float(candidate.get("options_context_confidence_score")) or 0.0
+    regime = str(candidate.get("options_context_regime") or "").strip().lower()
+    expected_move = _to_float(candidate.get("options_context_expected_move_1d_pct"))
+    skew_ratio = _to_float(candidate.get("options_context_skew_25d_put_call_ratio"))
+
+    if confidence >= 0.75:
+        score += 0.15
+    elif confidence < 0.50:
+        score -= 0.25
+
+    if regime in {
+        "tradable",
+        "broad_liquid",
+        "balanced_liquid",
+        "call_heavy_liquid",
+        "put_heavy_liquid",
+    }:
+        score += 0.10
+    elif regime in {"thin", "limited", "illiquid"}:
+        score -= 0.20
+
+    if expected_move is not None and expected_move >= 1.5:
+        score += 0.05
+    elif expected_move is not None and expected_move < 1.0:
+        score -= 0.10
+
+    if skew_ratio is not None and skew_ratio >= 1.20:
+        score -= 0.05
+
+    return score
+
+
 def score_trade_candidate(candidate: dict[str, object]) -> float:
     """Score a trade candidate using the spread scoring model.
 
@@ -34,10 +85,11 @@ def score_trade_candidate(candidate: dict[str, object]) -> float:
                 net_credit=net_credit,
                 width=width,
             )
-            return breakdown["total"]
+            return breakdown["total"] + _options_context_ranking_adjustment(candidate)
 
         # Fallback: simple credit/width
-        return net_credit / width if width > 0 else 0.0
+        base = net_credit / width if width > 0 else 0.0
+        return base + _options_context_ranking_adjustment(candidate)
 
     if strategy_family == "BULL_CALL_SPREAD":
         long_leg_delta = float(candidate.get("long_delta", 0.0) or 0.0)
@@ -51,14 +103,15 @@ def score_trade_candidate(candidate: dict[str, object]) -> float:
                 net_debit=net_debit,
                 width=width,
             )
-            return breakdown["total"]
+            return breakdown["total"] + _options_context_ranking_adjustment(candidate)
 
         # Fallback: 1 - debit/width (lower debit = better)
-        return max(0.0, 1.0 - net_debit / width) if width > 0 else 0.0
+        base = max(0.0, 1.0 - net_debit / width) if width > 0 else 0.0
+        return base + _options_context_ranking_adjustment(candidate)
 
     # Generic fallback
     credit = float(cast(float | int | str, candidate.get("net_credit", 0.0) or 0.0))
-    return credit / width
+    return (credit / width) + _options_context_ranking_adjustment(candidate)
 
 
 def rank_trade_candidates(
