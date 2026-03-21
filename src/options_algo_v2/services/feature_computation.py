@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+from math import log, sqrt
+from statistics import pstdev
+
 from options_algo_v2.domain.bar_data import BarData
 from options_algo_v2.domain.computed_features import ComputedUnderlyingFeatures
+
+TRADING_DAYS_PER_YEAR = 252.0
 
 
 def compute_sma(values: list[float], period: int) -> float:
@@ -177,6 +182,36 @@ def compute_breakout_volume_multiple(bars: list[BarData]) -> float:
     return latest_volume / avg_volume
 
 
+def compute_avg_daily_volume20(bars: list[BarData]) -> float | None:
+    if len(bars) < 20:
+        return None
+    volumes = [float(bar.volume) for bar in bars[-20:]]
+    if not volumes:
+        return None
+    return sum(volumes) / len(volumes)
+
+
+def compute_hv20_from_bars(bars: list[BarData]) -> float | None:
+    if len(bars) < 21:
+        return None
+
+    closes = [bar.close for bar in bars if bar.close > 0]
+    if len(closes) < 21:
+        return None
+
+    log_returns: list[float] = []
+    for previous, current in zip(closes[:-1], closes[1:], strict=False):
+        if previous <= 0 or current <= 0:
+            continue
+        log_returns.append(log(current / previous))
+
+    if len(log_returns) < 20:
+        return None
+
+    stdev = pstdev(log_returns[-20:])
+    return stdev * sqrt(TRADING_DAYS_PER_YEAR)
+
+
 def compute_underlying_features(
     bars: list[BarData],
 ) -> ComputedUnderlyingFeatures:
@@ -198,3 +233,97 @@ def compute_underlying_features(
         breakdown_below_20d_low=compute_breakdown_below_20d_low(bars),
         breakout_volume_multiple=compute_breakout_volume_multiple(bars),
     )
+
+
+def compute_feature_rows_for_history(
+    *,
+    symbol: str,
+    bars: list[BarData],
+    iv_proxy_by_date: dict[str, float] | None = None,
+    feature_version: str = "feature_v1",
+    iv_method_version: str = "atm_proxy_v1",
+    iv_rank_window: int = 60,
+) -> list[dict[str, object]]:
+    iv_proxy_by_date = iv_proxy_by_date or {}
+    rows: list[dict[str, object]] = []
+    iv_history_values: list[float] = []
+
+    for end_index in range(len(bars)):
+        window = bars[: end_index + 1]
+        bar = window[-1]
+        as_of_date = str(bar.timestamp)[:10]
+
+        implied_vol_proxy = iv_proxy_by_date.get(as_of_date)
+        if implied_vol_proxy is not None and implied_vol_proxy > 0:
+            iv_history_values.append(float(implied_vol_proxy))
+
+        close = float(bar.close)
+        dma20 = None
+        dma50 = None
+        atr20 = None
+        adx14 = None
+        rsi14 = None
+        five_day_return = None
+        breakout_above_20d_high = False
+        breakdown_below_20d_low = False
+        breakout_volume_multiple = 1.0
+        avg_daily_volume = compute_avg_daily_volume20(window)
+        hv20 = compute_hv20_from_bars(window)
+        iv_rank = None
+        iv_hv_ratio = None
+
+        closes = [b.close for b in window]
+
+        if len(window) >= 20:
+            dma20 = compute_sma(closes, 20)
+        if len(window) >= 50:
+            dma50 = compute_sma(closes, 50)
+        if len(window) >= 21:
+            atr20 = compute_atr20(window)
+            breakout_above_20d_high = compute_breakout_above_20d_high(window)
+            breakdown_below_20d_low = compute_breakdown_below_20d_low(window)
+            breakout_volume_multiple = compute_breakout_volume_multiple(window)
+        if len(window) >= 29:
+            adx14 = compute_adx14(window)
+        if len(window) >= 15:
+            rsi14 = compute_rsi14(window)
+        if len(window) >= 6:
+            five_day_return = compute_five_day_return(window)
+
+        if len(iv_history_values) >= iv_rank_window:
+            iv_window = iv_history_values[-iv_rank_window:]
+            current_iv = iv_window[-1]
+            iv_min = min(iv_window)
+            iv_max = max(iv_window)
+            if iv_max == iv_min:
+                iv_rank = 50.0
+            elif iv_max > iv_min:
+                iv_rank = max(0.0, min(100.0, 100.0 * (current_iv - iv_min) / (iv_max - iv_min)))
+
+        if implied_vol_proxy is not None and hv20 is not None and hv20 > 0:
+            iv_hv_ratio = implied_vol_proxy / hv20
+
+        rows.append(
+            {
+                "symbol": symbol,
+                "as_of_date": as_of_date,
+                "close": close,
+                "dma20": dma20,
+                "dma50": dma50,
+                "atr20": atr20,
+                "adx14": adx14,
+                "rsi14": rsi14,
+                "five_day_return": five_day_return,
+                "breakout_above_20d_high": breakout_above_20d_high,
+                "breakdown_below_20d_low": breakdown_below_20d_low,
+                "breakout_volume_multiple": breakout_volume_multiple,
+                "avg_daily_volume": avg_daily_volume,
+                "hv20": hv20,
+                "iv_rank": iv_rank,
+                "iv_hv_ratio": iv_hv_ratio,
+                "feature_version": feature_version,
+                "iv_method_version": iv_method_version,
+            }
+        )
+
+    return rows

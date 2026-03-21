@@ -53,7 +53,92 @@ from options_algo_v2.services.scan_artifact_orchestrator import (
 )
 from options_algo_v2.services.universe_loader import load_universe_symbols
 
+
 IV_RANK_TRAILING_OBSERVATIONS = 60
+
+def _load_iv_history_from_sqlite(db_path, symbol, as_of_date, trailing_limit):
+    import sqlite3
+
+    if not db_path:
+        return []
+    db_file = Path(db_path)
+    if not db_file.exists():
+        return []
+
+    candidate_value_columns = ["implied_vol_proxy", "iv_proxy", "iv_value", "implied_volatility", "value"]
+    for value_col in candidate_value_columns:
+        try:
+            conn = sqlite3.connect(str(db_file))
+            try:
+                rows = conn.execute(
+                    f"""
+                    SELECT as_of_date, {value_col}
+                    FROM iv_proxy_daily
+                    WHERE symbol = ?
+                      AND as_of_date <= ?
+                      AND {value_col} IS NOT NULL
+                    ORDER BY as_of_date DESC
+                    LIMIT ?
+                    """,
+                    (symbol, as_of_date, trailing_limit),
+                ).fetchall()
+            finally:
+                conn.close()
+            if rows:
+                rows = list(reversed(rows))
+                return [
+                    {"as_of_date": row[0], "iv_proxy": float(row[1])}
+                    for row in rows
+                    if row[1] is not None
+                ]
+        except Exception:
+            continue
+    return []
+
+def _load_iv_history_from_jsonl(history_path, symbol, as_of_date, trailing_limit):
+    if not history_path:
+        return []
+    history_file = Path(history_path)
+    if not history_file.exists():
+        return []
+
+    rows = []
+    with history_file.open("r", encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            if obj.get("symbol") != symbol:
+                continue
+            row_date = obj.get("as_of_date")
+            if not row_date or row_date > as_of_date:
+                continue
+            value = (
+                obj.get("iv_proxy")
+                if obj.get("iv_proxy") is not None
+                else obj.get("iv")
+            )
+            if value is None:
+                continue
+            try:
+                rows.append({"as_of_date": row_date, "iv_proxy": float(value)})
+            except Exception:
+                continue
+
+    rows.sort(key=lambda x: x["as_of_date"])
+    if trailing_limit and len(rows) > trailing_limit:
+        rows = rows[-trailing_limit:]
+    return rows
+
+def _load_iv_history_sqlite_first(db_path, history_path, symbol, as_of_date, trailing_limit):
+    sqlite_rows = _load_iv_history_from_sqlite(db_path, symbol, as_of_date, trailing_limit)
+    if sqlite_rows:
+        return sqlite_rows, "sqlite", len(sqlite_rows), 0
+    return [], "none", 0, 0
 
 
 def _load_symbols_from_watchlist(path: Path) -> list[str]:
@@ -280,10 +365,10 @@ def _compute_live_iv_metrics(
     bar_rows: list[dict[str, object]],
     snapshot: OptionsChainSnapshot | None,
     as_of_date: date,
-) -> tuple[float | None, float | None]:
+) -> tuple[float | None, float | None, bool]:
     latest_close = _get_latest_close(bar_rows)
     if latest_close is None or latest_close <= 0 or snapshot is None:
-        return None, None
+        return None, None, False
 
     implied_vol_proxy = estimate_near_atm_implied_vol(
         snapshot=snapshot,
@@ -296,25 +381,58 @@ def _compute_live_iv_metrics(
         underlying_price=latest_close,
     )
 
-    if implied_vol_proxy is not None:
-        history_path = default_iv_rank_history_path()
-        append_iv_proxy_observation(
-            path=history_path,
-            observation=IvProxyObservation(
-                as_of_date=as_of_date.isoformat(),
-                symbol=symbol,
-                implied_vol_proxy=implied_vol_proxy,
-            ),
-        )
-        iv_rank = compute_iv_rank_from_history(
-            path=history_path,
-            symbol=symbol,
-            trailing_observations=IV_RANK_TRAILING_OBSERVATIONS,
-        )
-    else:
-        iv_rank = None
+    iv_rank = None
+    used_proxy_iv_rank = False
 
-    return iv_rank, iv_hv_ratio
+    if implied_vol_proxy is not None:
+        market_history_db_path = Path(
+            os.getenv("MARKET_HISTORY_DB_PATH", "data/cache/market_history_watchlist60.db")
+        )
+        history_rows, history_source, sqlite_count, jsonl_count = _load_iv_history_sqlite_first(
+            db_path=str(market_history_db_path),
+            history_path="",
+            symbol=symbol,
+            as_of_date=as_of_date.isoformat(),
+            trailing_limit=IV_RANK_TRAILING_OBSERVATIONS,
+        )
+
+        observation_values = [
+            float(row["iv_proxy"])
+            for row in history_rows
+            if row.get("iv_proxy") is not None
+        ]
+        observation_count = len(observation_values)
+
+        iv_rank_proxy_ready_observations = 20
+
+        if observation_count >= IV_RANK_TRAILING_OBSERVATIONS:
+            trailing_values = observation_values[-IV_RANK_TRAILING_OBSERVATIONS:]
+            current_iv = trailing_values[-1]
+            iv_min = min(trailing_values)
+            iv_max = max(trailing_values)
+            if iv_max > iv_min:
+                iv_rank = ((current_iv - iv_min) / (iv_max - iv_min)) * 100.0
+            else:
+                iv_rank = 0.0
+        elif observation_count >= iv_rank_proxy_ready_observations:
+            trailing_values = observation_values[-observation_count:]
+            current_iv = trailing_values[-1]
+            iv_min = min(trailing_values)
+            iv_max = max(trailing_values)
+            if iv_max > iv_min:
+                iv_rank = ((current_iv - iv_min) / (iv_max - iv_min)) * 100.0
+            else:
+                iv_rank = 0.0
+            used_proxy_iv_rank = iv_rank is not None
+
+        print(
+            f"iv_rank_history_debug symbol={symbol} "
+            f"source={history_source} sqlite_count={sqlite_count} "
+            f"jsonl_count={jsonl_count} used_count={observation_count} "
+            f"db_path={market_history_db_path}"
+        )
+
+    return iv_rank, iv_hv_ratio, used_proxy_iv_rank
 
 
 def _build_live_liquidity_inputs(
@@ -525,7 +643,7 @@ def _build_raw_feature_with_fallback(
         symbol=symbol,
     )
 
-    real_iv_rank, real_iv_hv_ratio = _compute_live_iv_metrics(
+    real_iv_rank, real_iv_hv_ratio, used_proxy_iv_rank = _compute_live_iv_metrics(
         symbol=symbol,
         bar_rows=bar_rows,
         snapshot=snapshot,
@@ -730,7 +848,7 @@ def run_nightly_scan(
             "placeholder live inputs are not allowed in strict live mode"
         )
 
-    history_path = default_iv_rank_history_path()
+    history_path = Path(os.getenv("MARKET_HISTORY_DB_PATH", "data/cache/market_history_watchlist60.db"))
 
     decisions = evaluate_raw_feature_batch(raw_features)
     decisions, options_context_decision_debug = apply_options_context_to_decisions(

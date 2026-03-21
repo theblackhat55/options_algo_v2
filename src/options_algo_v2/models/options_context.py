@@ -1,19 +1,56 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
-from typing import Any
+from dataclasses import dataclass, field
 
 
-@dataclass(slots=True)
-class OptionsContextRow:
+@dataclass(frozen=True)
+class ExpectedMoveSnapshot:
+    expected_move_1d_pct: float | None = None
+    expected_move_1w_pct: float | None = None
+    expected_move_30d_pct: float | None = None
+
+
+@dataclass(frozen=True)
+class SkewSnapshot:
+    skew_25d_put_call_ratio: float | None = None
+    skew_25d_put_call_spread: float | None = None
+
+
+@dataclass(frozen=True)
+class PositioningSnapshot:
+    call_oi_total: int | None = None
+    put_oi_total: int | None = None
+    call_volume_total: int | None = None
+    put_volume_total: int | None = None
+    pcr_oi: float | None = None
+    pcr_volume: float | None = None
+
+
+@dataclass(frozen=True)
+class GammaStructureSnapshot:
+    max_gamma_strike: float | None = None
+    gamma_flip_estimate: float | None = None
+    distance_to_gamma_flip_pct: float | None = None
+    gex_per_1pct_move: float | None = None
+    nearest_expiry_gamma_pct: float | None = None
+
+
+@dataclass(frozen=True)
+class OptionsContextSnapshot:
     symbol: str
     as_of_utc: str
-    source_provider: str
+    spot_price: float | None
 
     contract_count: int | None = None
     expiration_count: int | None = None
-    call_count: int | None = None
-    put_count: int | None = None
+    atm_iv: float | None = None
+
+    expected_move_1d_pct: float | None = None
+    expected_move_1w_pct: float | None = None
+    expected_move_30d_pct: float | None = None
+
+    skew_25d_put_call_ratio: float | None = None
+    skew_25d_put_call_spread: float | None = None
 
     call_oi_total: int | None = None
     put_oi_total: int | None = None
@@ -22,47 +59,21 @@ class OptionsContextRow:
     pcr_oi: float | None = None
     pcr_volume: float | None = None
 
-    atm_iv: float | None = None
-    expected_move_1d_pct: float | None = None
-    expected_move_1w_pct: float | None = None
-    expected_move_30d_pct: float | None = None
-
-    skew_25d_put_call_ratio: float | None = None
-    skew_25d_put_call_spread: float | None = None
-
-    nonzero_bid_ask_count: int | None = None
-    nonzero_open_interest_count: int | None = None
-    nonzero_delta_count: int | None = None
-    nonzero_iv_count: int | None = None
-
     nonzero_bid_ask_ratio: float | None = None
     nonzero_open_interest_ratio: float | None = None
     nonzero_delta_ratio: float | None = None
     nonzero_iv_ratio: float | None = None
 
+    max_gamma_strike: float | None = None
+    gamma_flip_estimate: float | None = None
+    distance_to_gamma_flip_pct: float | None = None
+    gex_per_1pct_move: float | None = None
+    nearest_expiry_gamma_pct: float | None = None
+
+    options_flow_regime: str | None = None
     options_summary_regime: str | None = None
 
     confidence_score: float = 0.0
     confidence_reasons: list[str] = field(default_factory=list)
     missing_fields: list[str] = field(default_factory=list)
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(slots=True)
-class OptionsContextSnapshot:
-    run_id: str
-    generated_at_utc: str
-    source_watchlist: str
-    symbol_count: int
-    rows: list[OptionsContextRow]
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "run_id": self.run_id,
-            "generated_at_utc": self.generated_at_utc,
-            "source_watchlist": self.source_watchlist,
-            "symbol_count": self.symbol_count,
-            "rows": [row.to_dict() for row in self.rows],
-        }
+    source_provider: str = ""

@@ -6,6 +6,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 
+LATEST_OPTIONS_CONTEXT_PATH = Path("data/validation/latest_options_context.json")
+
+
 def _parse_args(argv: list[str]) -> tuple[Path, int | None]:
     if not argv:
         raise SystemExit(
@@ -36,12 +39,82 @@ def _load_rows(path: Path) -> list[dict[str, object]]:
     return [row for row in rows if isinstance(row, dict)]
 
 
+def _load_latest_options_context(
+    path: Path = LATEST_OPTIONS_CONTEXT_PATH,
+) -> dict[str, dict[str, object]]:
+    if not path.exists():
+        return {}
+
+    payload = json.loads(path.read_text())
+    rows = payload.get("rows", [])
+    if not isinstance(rows, list):
+        return {}
+
+    by_symbol: dict[str, dict[str, object]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        symbol = row.get("symbol")
+        if not isinstance(symbol, str) or not symbol.strip():
+            continue
+        by_symbol[symbol.strip().upper()] = row
+    return by_symbol
+
+
+def _enrich_row_with_options_context(
+    row: dict[str, object],
+    context_by_symbol: dict[str, dict[str, object]],
+) -> dict[str, object]:
+    enriched = dict(row)
+    symbol = str(row.get("symbol", "")).strip().upper()
+    context = context_by_symbol.get(symbol, {})
+
+    field_names = [
+        "expected_move_1d_pct",
+        "expected_move_1w_pct",
+        "expected_move_30d_pct",
+        "skew_25d_put_call_ratio",
+        "skew_25d_put_call_spread",
+        "pcr_oi",
+        "pcr_volume",
+        "confidence_score",
+        "confidence_reasons",
+        "missing_fields",
+        "source_provider",
+    ]
+
+    for field_name in field_names:
+        if field_name in context:
+            enriched[field_name] = context[field_name]
+
+    if "confidence_score" in enriched:
+        enriched["options_context_confidence"] = enriched.get("confidence_score")
+
+    if context:
+        enriched["options_context_available"] = True
+    else:
+        enriched["options_context_available"] = False
+        enriched.setdefault("expected_move_1d_pct", None)
+        enriched.setdefault("expected_move_1w_pct", None)
+        enriched.setdefault("expected_move_30d_pct", None)
+        enriched.setdefault("skew_25d_put_call_ratio", None)
+        enriched.setdefault("skew_25d_put_call_spread", None)
+        enriched.setdefault("pcr_oi", None)
+        enriched.setdefault("pcr_volume", None)
+        enriched.setdefault("options_context_confidence", None)
+        enriched.setdefault("confidence_reasons", [])
+        enriched.setdefault("missing_fields", [])
+
+    return enriched
+
+
 def filter_options_watchlist(source_path: str, top_n: int | None = None) -> str:
     path = Path(source_path)
     rows = _load_rows(path)
+    context_by_symbol = _load_latest_options_context()
 
     viable_rows = [
-        row
+        _enrich_row_with_options_context(row, context_by_symbol)
         for row in rows
         if bool(row.get("options_viable", False))
     ]
@@ -72,9 +145,14 @@ def filter_options_watchlist(source_path: str, top_n: int | None = None) -> str:
 
     top_symbols = [row.get("symbol") for row in viable_rows[:10]]
 
+    context_coverage = sum(
+        1 for row in viable_rows if bool(row.get("options_context_available", False))
+    )
+
     print(f"source_watchlist_path={path}")
     print(f"top_n={top_n}")
     print(f"row_count={len(viable_rows)}")
+    print(f"options_context_coverage={context_coverage}/{len(viable_rows) if viable_rows else 0}")
     print(f"output_path={output_path}")
     print(f"top_filtered_symbols={top_symbols}")
 
