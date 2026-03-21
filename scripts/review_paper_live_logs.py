@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +21,12 @@ def _load_jsonl(path: Path) -> list[dict[str, Any]]:
 
 def _fmt_top(counter: Counter[str], limit: int = 10) -> list[tuple[str, int]]:
     return counter.most_common(limit)
+
+
+def _avg(values: list[float]) -> float | None:
+    if not values:
+        return None
+    return sum(values) / len(values)
 
 
 def _filter_run_rows(
@@ -147,12 +153,19 @@ def main() -> int:
     placeholder_iv_rank_count = 0
     placeholder_iv_hv_ratio_count = 0
 
+    options_context_matched_total = 0
+    options_context_missing_total = 0
+    options_context_decision_adjusted_total = 0
+    options_context_hard_reject_total = 0
+
     passed_symbol_counter: Counter[str] = Counter()
     top_trade_symbol_counter: Counter[str] = Counter()
     trade_idea_symbol_counter: Counter[str] = Counter()
     rejection_reason_counter: Counter[str] = Counter()
     signal_state_counter: Counter[str] = Counter()
     strategy_type_counter: Counter[str] = Counter()
+    options_context_regime_counter: Counter[str] = Counter()
+    options_context_applied_reason_counter: Counter[str] = Counter()
 
     for row in run_rows:
         total_symbols += int(row.get("symbol_count") or 0)
@@ -165,6 +178,15 @@ def main() -> int:
             placeholder_iv_rank_count += 1
         if bool(row.get("used_placeholder_iv_hv_ratio_inputs")):
             placeholder_iv_hv_ratio_count += 1
+
+        options_context_matched_total += int(row.get("options_context_matched_count") or 0)
+        options_context_missing_total += int(row.get("options_context_missing_count") or 0)
+        options_context_decision_adjusted_total += int(
+            row.get("options_context_decision_adjusted_symbol_count") or 0
+        )
+        options_context_hard_reject_total += int(
+            row.get("options_context_hard_reject_count") or 0
+        )
 
         for symbol in row.get("passed_symbols", []):
             if isinstance(symbol, str):
@@ -196,6 +218,18 @@ def main() -> int:
                 if isinstance(key, str):
                     strategy_type_counter[key] += int(value)
 
+        regime_counts = row.get("options_context_regime_counts", {})
+        if isinstance(regime_counts, dict):
+            for key, value in regime_counts.items():
+                if isinstance(key, str):
+                    options_context_regime_counter[key] += int(value)
+
+        applied_reason_counts = row.get("options_context_applied_reason_counts", {})
+        if isinstance(applied_reason_counts, dict):
+            for key, value in applied_reason_counts.items():
+                if isinstance(key, str):
+                    options_context_applied_reason_counter[key] += int(value)
+
     print("run_summary:")
     print(f"  total_symbols_evaluated={total_symbols}")
     print(f"  total_passed={total_passed}")
@@ -207,6 +241,12 @@ def main() -> int:
     print(f"  degraded_live_run_count={degraded_count}")
     print(f"  placeholder_iv_rank_run_count={placeholder_iv_rank_count}")
     print(f"  placeholder_iv_hv_ratio_run_count={placeholder_iv_hv_ratio_count}")
+    print(f"  options_context_matched_total={options_context_matched_total}")
+    print(f"  options_context_missing_total={options_context_missing_total}")
+    print(
+        f"  options_context_decision_adjusted_total={options_context_decision_adjusted_total}"
+    )
+    print(f"  options_context_hard_reject_total={options_context_hard_reject_total}")
 
     print(f"top_passed_symbols={_fmt_top(passed_symbol_counter)}")
     print(f"top_trade_candidate_symbols={_fmt_top(top_trade_symbol_counter)}")
@@ -214,6 +254,11 @@ def main() -> int:
     print(f"rejection_reasons={_fmt_top(rejection_reason_counter)}")
     print(f"signal_states={_fmt_top(signal_state_counter)}")
     print(f"strategy_types={_fmt_top(strategy_type_counter)}")
+    print(f"options_context_regimes={_fmt_top(options_context_regime_counter)}")
+    print(
+        "options_context_applied_reasons="
+        f"{_fmt_top(options_context_applied_reason_counter)}"
+    )
 
     if not symbol_rows:
         print("no symbol rows found")
@@ -225,13 +270,19 @@ def main() -> int:
     market_regime_counter: Counter[str] = Counter()
     iv_state_counter: Counter[str] = Counter()
     symbol_rejection_counter: Counter[str] = Counter()
+    options_summary_regime_counter: Counter[str] = Counter()
+    options_context_reason_counter: Counter[str] = Counter()
+    options_penalized_symbol_counter: Counter[str] = Counter()
+    confidence_by_symbol: dict[str, list[float]] = defaultdict(list)
 
     for row in symbol_rows:
         symbol = row.get("symbol")
-        if isinstance(symbol, str):
-            symbol_counter[symbol] += 1
+        symbol_str = symbol if isinstance(symbol, str) else None
+
+        if symbol_str is not None:
+            symbol_counter[symbol_str] += 1
             if bool(row.get("final_passed")):
-                symbol_pass_counter[symbol] += 1
+                symbol_pass_counter[symbol_str] += 1
 
         directional_state = row.get("directional_state")
         if isinstance(directional_state, str):
@@ -249,6 +300,29 @@ def main() -> int:
             if isinstance(reason, str):
                 symbol_rejection_counter[reason] += 1
 
+        options_summary_regime = row.get("options_summary_regime")
+        if isinstance(options_summary_regime, str):
+            options_summary_regime_counter[options_summary_regime] += 1
+
+        options_confidence_score = row.get("options_confidence_score")
+        if symbol_str is not None and isinstance(options_confidence_score, (int, float)):
+            confidence_by_symbol[symbol_str].append(float(options_confidence_score))
+
+        context_reason_codes = row.get("options_context_reason_codes", [])
+        if isinstance(context_reason_codes, list):
+            if symbol_str is not None and context_reason_codes:
+                options_penalized_symbol_counter[symbol_str] += 1
+            for reason in context_reason_codes:
+                if isinstance(reason, str):
+                    options_context_reason_counter[reason] += 1
+
+    avg_confidence_rows: list[tuple[str, float]] = []
+    for symbol, values in confidence_by_symbol.items():
+        avg_value = _avg(values)
+        if avg_value is not None:
+            avg_confidence_rows.append((symbol, round(avg_value, 4)))
+    avg_confidence_rows.sort(key=lambda item: item[1], reverse=True)
+
     print("symbol_summary:")
     print(f"  symbols_seen={_fmt_top(symbol_counter)}")
     print(f"  symbols_passed={_fmt_top(symbol_pass_counter)}")
@@ -256,6 +330,10 @@ def main() -> int:
     print(f"  market_regimes={_fmt_top(market_regime_counter)}")
     print(f"  iv_states={_fmt_top(iv_state_counter)}")
     print(f"  symbol_rejection_reasons={_fmt_top(symbol_rejection_counter)}")
+    print(f"  options_summary_regimes={_fmt_top(options_summary_regime_counter)}")
+    print(f"  options_context_reason_codes={_fmt_top(options_context_reason_counter)}")
+    print(f"  options_penalized_symbols={_fmt_top(options_penalized_symbol_counter)}")
+    print(f"  avg_options_confidence_by_symbol={avg_confidence_rows[:10]}")
 
     return 0
 
