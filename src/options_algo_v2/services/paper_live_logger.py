@@ -129,6 +129,15 @@ def build_run_summary_row(payload: dict[str, Any]) -> dict[str, Any]:
         "options_context_top_skew_symbols": runtime_metadata.get(
             "options_context_top_skew_symbols", []
         ),
+        "options_context_decision_adjusted_symbol_count": runtime_metadata.get(
+            "options_context_decision_adjusted_symbol_count"
+        ),
+        "options_context_hard_reject_count": runtime_metadata.get(
+            "options_context_hard_reject_count"
+        ),
+        "options_context_applied_reason_counts": runtime_metadata.get(
+            "options_context_applied_reason_counts", {}
+        ),
         "rejection_reason_counts": summary.get("rejection_reason_counts", {}),
         "signal_state_counts": summary.get("signal_state_counts", {}),
         "strategy_type_counts": summary.get("strategy_type_counts", {}),
@@ -140,6 +149,10 @@ def build_symbol_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
     feature_debug = runtime_metadata.get("feature_debug_by_symbol", {})
     decision_trace = runtime_metadata.get("decision_trace_by_symbol", {})
     options_context_by_symbol = runtime_metadata.get("options_context_by_symbol", {})
+    options_context_decision_debug_by_symbol = runtime_metadata.get(
+        "options_context_decision_debug_by_symbol",
+        {},
+    )
 
     rows: list[dict[str, Any]] = []
     for decision in payload.get("decisions", []):
@@ -153,6 +166,10 @@ def build_symbol_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
         feature_row = feature_debug.get(symbol, {})
         trace_row = decision_trace.get(symbol, {})
         options_context_row = options_context_by_symbol.get(symbol, {})
+        options_context_decision_debug_row = options_context_decision_debug_by_symbol.get(
+            symbol,
+            {},
+        )
 
         row = {
             "timestamp_utc": _utc_timestamp(),
@@ -216,7 +233,21 @@ def build_symbol_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
             "options_nonzero_iv_ratio": options_context_row.get("nonzero_iv_ratio"),
             "options_summary_regime": options_context_row.get("options_summary_regime"),
             "options_confidence_score": options_context_row.get("confidence_score"),
-            "options_context_reason_codes": options_context_row.get("reason_codes", []),
+            "options_context_reason_codes": options_context_decision_debug_row.get(
+                "applied_reason_codes", []
+            ),
+            "options_context_score_delta": options_context_decision_debug_row.get(
+                "score_delta"
+            ),
+            "options_context_hard_reject": options_context_decision_debug_row.get(
+                "hard_reject"
+            ),
+            "options_context_final_score_after_context": options_context_decision_debug_row.get(
+                "final_score_after_context"
+            ),
+            "options_context_final_passed_after_context": options_context_decision_debug_row.get(
+                "final_passed_after_context"
+            ),
         }
         rows.append(row)
 
@@ -281,6 +312,13 @@ def append_paper_live_logs(
         "options_context_top_skew_symbols": _json_list(
             run_row["options_context_top_skew_symbols"]
         ),
+        "options_context_decision_adjusted_symbol_count": run_row[
+            "options_context_decision_adjusted_symbol_count"
+        ],
+        "options_context_hard_reject_count": run_row["options_context_hard_reject_count"],
+        "options_context_applied_reason_counts": _json_dict(
+            run_row["options_context_applied_reason_counts"]
+        ),
         "rejection_reason_counts": _json_dict(run_row["rejection_reason_counts"]),
         "signal_state_counts": _json_dict(run_row["signal_state_counts"]),
         "strategy_type_counts": _json_dict(run_row["strategy_type_counts"]),
@@ -312,6 +350,9 @@ def append_paper_live_logs(
             "options_context_low_confidence_symbols",
             "options_context_top_expected_move_symbols",
             "options_context_top_skew_symbols",
+            "options_context_decision_adjusted_symbol_count",
+            "options_context_hard_reject_count",
+            "options_context_applied_reason_counts",
             "rejection_reason_counts",
             "signal_state_counts",
             "strategy_type_counts",
