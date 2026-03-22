@@ -12,10 +12,6 @@ from options_algo_v2.services.options_chain_provider_factory import (
     get_options_chain_provider_source,
 )
 from options_algo_v2.services.options_context_service import compute_options_context_snapshot
-from options_algo_v2.services.options_context_store import (
-    append_options_context_history,
-    write_latest_options_context_snapshot,
-)
 from options_algo_v2.services.options_context_sqlite_store import (
     upsert_options_context_snapshots,
 )
@@ -78,8 +74,6 @@ def build_options_context_snapshot(
         if snapshot.confidence_score < 0.5:
             low_confidence_symbols.append(symbol)
 
-    latest_path = write_latest_options_context_snapshot(snapshots)
-    history_path = append_options_context_history(snapshots)
     sqlite_db_path = upsert_options_context_snapshots(
         db_path=db_path,
         snapshots=snapshots,
@@ -89,12 +83,10 @@ def build_options_context_snapshot(
     print(f"options_chain_provider={provider_name}")
     print(f"options_chain_provider_source={provider_source}")
     print(f"row_count={len(snapshots)}")
-    print(f"latest_snapshot_path={latest_path}")
-    print(f"history_path={history_path}")
     print(f"sqlite_db_path={sqlite_db_path}")
     print(f"low_confidence_symbols={low_confidence_symbols}")
 
-    return str(latest_path)
+    return str(sqlite_db_path)
 
 
 def _to_float(value: object) -> float | None:
