@@ -1,140 +1,97 @@
 # Live Pipeline Status Summary
 
-## Overview
-The options algorithm has progressed from partially mocked evaluation to a working **paper-live pipeline** with real market structure inputs, live scan diagnostics, and persistent validation logging.
+## Current State (as of 2026-03-22)
 
-The system now runs end-to-end in live mode, produces explainable scan artifacts, generates trade candidates and trade ideas, and records daily validation outputs for later review.
+The platform runs a fully functional **paper-live pipeline** with real market data, explainable scan artifacts, spread selection, trade idea generation, and persistent validation logging.
 
 ---
 
-## What is now live / real
+## What is live and working
 
 ### Historical market data
-- **Databento daily bars** are used in live mode
-- Real underlying features are computed from bars:
-  - `close`
-  - `dma20`
-  - `dma50`
-  - `atr20`
-  - `adx14`
+- **Databento daily bars** in live mode
+- Real computed features: `close`, `dma20`, `dma50`, `atr20`, `adx14`, `rsi14`, `hv20`
 
 ### Market breadth
-- Live market breadth provider is wired
-- Breadth override handling is supported and surfaced in runtime metadata
+- Live market breadth provider wired into regime classifier
+- Breadth override flag surfaced in runtime metadata when override is active
 
-### Options chain / options selection
-- **Polygon live options chain snapshots** are used
-- Option quote normalization includes:
-  - bid / ask / mid
-  - delta
-  - open interest
-  - volume
-  - implied volatility
-- Spread selection and leg orientation were corrected
-- Trade ideas now contain correct option symbols / strikes in CLI output
+### Options chain
+- **Polygon live options chain snapshots**
+- Quote normalization: bid / ask / mid / delta / open interest / volume / IV
+- Options context snapshot: PCR, skew, expected move (1d/1w/30d), chain confidence
+- Options context score adjustment and hard-reject for untradeable chains
 
 ### Volatility features
-- **`iv_hv_ratio` is now real**
-  - implied-vol proxy is derived from near-ATM Polygon chain contracts
-  - historical volatility is derived from Databento daily bars using log returns
-- **IV proxy history persistence is now implemented**
-  - stored at `data/state/iv_proxy_history.jsonl`
-- **First-pass `iv_rank` infrastructure exists**
-  - current implied-vol proxy is persisted daily
-  - rolling `iv_rank` will become real once enough history accumulates
+- **`iv_hv_ratio` is real** — near-ATM Polygon IV proxy ÷ HV20 from Databento bars
+- **`iv_rank` infrastructure exists** — percentile rank over 60-observation rolling window; stays at placeholder (50.0) until 60 observations per symbol accumulate
+- History stored at `data/state/iv_proxy_history.jsonl`
 
-### Scan diagnostics / transparency
-- Scan artifacts expose:
-  - feature debug by symbol
-  - decision trace by symbol
-  - raw directional inputs
-  - directional checks
-  - rejection reasons
-- `scripts/inspect_scan_debug.py` can inspect per-symbol evaluation details
+### Classifiers and decision logic
+- Market regime: TREND_UP / TREND_DOWN / RANGE_UNCLEAR (RISK_OFF unreachable — `vix_defensive` hardwired False)
+- Directional state: BULLISH_CONTINUATION / BULLISH_BREAKOUT / BEARISH_CONTINUATION / BEARISH_BREAKDOWN / NEUTRAL / NO_TRADE
+- IV state: IV_RICH (2 active signals: `iv_rank ≥ 60` AND `iv_hv_ratio ≥ 1.25`) / IV_CHEAP / IV_NORMAL
+- Strategy selector: maps regime × directional × IV → spread type
+- Hard filters: event (earnings window), liquidity, extension (2×ATR from DMA20)
+- Candidate scoring: 100-pt model; all qualified candidates currently score 100.0 flat before options context adjustment (continuous ADX/IV/breadth inputs not yet passed to `score_candidate`)
+
+### Spread selection and trade ideas
+- Config-driven DTE/delta bands from `strategy_v1.yaml`
+- Spread scoring model (delta fit, liquidity, efficiency) for BULL_PUT_SPREAD and BULL_CALL_SPREAD
+- Trade idea generation and scan artifact writing
+- **Bear spread construction not yet wired** — BEAR_CALL_SPREAD and BEAR_PUT_SPREAD signals qualify correctly but `expiration_aware_spread_selector.py` returns empty candidates for both
 
 ### Paper-live validation tooling
-- Daily paper-live runner added
-- Logging outputs added:
-  - `data/validation/paper_live_runs.jsonl`
-  - `data/validation/paper_live_symbol_decisions.jsonl`
-  - `data/validation/paper_live_runs.csv`
-- Review tooling added:
-  - `scripts/review_paper_live_logs.py`
-  - `scripts/paper_live_symbol_leaderboard.py`
+- `scripts/run_paper_live_daily.py` — daily scan with validation log append
+- `data/validation/paper_live_runs.jsonl`, `paper_live_symbol_decisions.jsonl`, `paper_live_runs.csv`
+- `scripts/review_paper_live_logs.py` — multi-run pass rate, rejection reasons
+- `scripts/paper_live_symbol_leaderboard.py` — per-symbol pass frequency, ADX, IV/HV
+
+### Testing
+- 280 tests passing
 
 ---
 
-## What remains placeholder / degraded
+## Known gaps (code-confirmed)
 
-### `iv_rank`
-- `iv_rank` is still placeholder until enough distinct daily IV proxy observations accumulate
-- Runtime metadata now explicitly shows:
-  - `iv_rank_ready_symbols`
-  - `iv_rank_insufficient_history_symbols`
-  - `iv_rank_history_path`
-  - `iv_rank_trailing_observations`
-
-### Strict-live behavior
-- **Strict-live mode correctly fails** if placeholder IV inputs are still present
-- At present, strict-live remains blocked because `iv_rank` is not yet fully real
+| Gap | Location | Impact |
+|---|---|---|
+| `iv_rank` not auto-accumulating | `run_nightly_scan.py` imports but never calls `append_iv_proxy_observation` | IV rank stays placeholder until 60 obs/symbol exist |
+| Bear spread construction missing | `expiration_aware_spread_selector.py` handles BULL strategies only | Bear-regime signals produce zero trade candidates |
+| `iv_rv_spread` always None | `feature_normalizer.py` passes `iv_rv_spread=None` | Third IV-rich signal inactive; IV_RICH needs both rank ≥ 60 AND iv_hv ≥ 1.25 |
+| Continuous scoring not used | `decision_engine.py` passes booleans only to `score_candidate` | All qualified candidates score 100.0 flat before context adjustment |
+| `vix_defensive` hardwired False | `feature_normalizer.py` | RISK_OFF regime unreachable |
 
 ---
 
-## Current paper-live behavior
+## Strict-live status
 
-Recent paper-live runs show:
-
-- the pipeline is stable and repeatable
-- one consistently qualifying symbol has emerged: **XLE**
-- current pass rate on the filtered 10-symbol watchlist is approximately **10%**
-- most rejections are now due to **real directional-state logic**, not broken plumbing
-
-Observed patterns:
-- **XLE**: consistently passes with bullish continuation / rich IV profile
-- **AMD / AMZN / CRM / NFLX / NVDA / SMH**: often rejected as `NEUTRAL`
-- **JPM / TSLA / UBER**: often rejected as bearish continuation in an up regime
-
-This suggests the system is now producing **sparse but explainable** signals rather than failing because of placeholder feature inputs.
+Strict-live (`OPTIONS_ALGO_STRICT_LIVE_MODE=1`) is intentionally blocked while placeholder `iv_rank` inputs remain. This is a safety gate. Until `append_iv_proxy_observation` is wired into the scan loop and 60 observations per symbol accumulate, strict-live will not pass.
 
 ---
 
-## Current operational assessment
+## Operational assessment
 
-### Ready
-- paper-live monitoring
-- daily validation logging
-- multi-run review / leaderboard analysis
-- continued live signal observation
+### Safe now
+- Daily paper-live monitoring
+- Scan artifact inspection
+- Validation log review and leaderboard analysis
+- Watchlist experimentation
+- IV history accumulation
 
-### Not yet ready
-- unattended strict-live / production execution
-- full strict-live approval, because `iv_rank` is not yet fully real
-
----
-
-## Recommended next steps
-
-1. **Keep daily paper-live runs going**
-   - allow IV proxy history to accumulate
-   - monitor when symbols begin moving into `iv_rank_ready_symbols`
-
-2. **Continue reviewing multi-run logs**
-   - pass frequency
-   - repeated winners / rejects
-   - directional-state distribution
-   - strategy-family mix
-
-3. **Reassess after IV rank history matures**
-   - once enough observations exist, `iv_rank` can stop falling back
-   - then re-evaluate strict-live readiness
-
-4. **Only then consider threshold tuning**
-   - avoid overfitting before more live observations accumulate
+### Not yet safe
+- Unattended strict-live execution
+- Bear-regime signal-to-trade pipeline (spread construction missing)
+- Small-capital live deployment
 
 ---
 
-## Suggested short GitHub note
+## Near-term priorities
 
-Implemented a working paper-live options scan pipeline with real Databento bars, real ADX, real Polygon-derived IV/HV ratio, corrected spread construction, detailed scan diagnostics, and persistent paper-live validation logging/review tooling.
-
-Strict-live remains intentionally blocked because IV rank is still in a history-building phase. IV proxy history is now persisted and readiness metadata is exposed so the system can transition off placeholder IV rank once enough daily observations accumulate.
+1. Wire `append_iv_proxy_observation` into `run_nightly_scan.py` so IV proxy history auto-accumulates every live run
+2. Add bear spread construction to `expiration_aware_spread_selector.py`
+3. Pass continuous ADX/IV/breadth inputs to `score_candidate` in `decision_engine.py`
+4. Populate `iv_rv_spread` (IV proxy minus HV20) so the third IV signal activates
+5. Wire `expected_move.py`, `support_resistance.py`, and `regime_transition.py` into the main pipeline
+6. Complete production hardening (breadth freshness, quote-quality thresholds, risk caps)
+7. Enable strict-live after placeholder IV rank is eliminated

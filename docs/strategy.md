@@ -1,5 +1,7 @@
 # Strategy
 
+> This is a design document describing strategy philosophy and decision layers. For current implementation status and known gaps, see `live_status_summary.md`.
+
 ## System Definition
 `options_algo_v2` is a rule-based options structure-selection engine that maps:
 

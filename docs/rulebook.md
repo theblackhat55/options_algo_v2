@@ -6,7 +6,14 @@ Rulebook v1.0
 ## Purpose
 This document defines the deterministic MVP trading rules for `options_algo_v2`.
 
-It is the build spec for Phase 1 research and candidate-generation implementation.
+It is the authoritative rule spec. The implementation tracks this document closely but has several known gaps — see `docs/live_status_summary.md` for the current implementation delta.
+
+### Known implementation gaps (as of 2026-03-22)
+- **IV_RICH** requires 2-of-3 signals per the rulebook, but only 2 signals are active: `iv_rank ≥ 60` and `iv_hv_ratio ≥ 1.25`. The `iv_rv_spread` signal is always None.
+- **`iv_rank`** uses a 252-day lookback per the rulebook but currently uses a 60-observation rolling window. Until 60 observations accumulate per symbol, a placeholder (50.0) is used.
+- **Bear spread construction** (BEAR_CALL_SPREAD, BEAR_PUT_SPREAD) is defined in the rulebook and selected by the strategy selector, but `expiration_aware_spread_selector.py` does not yet construct bear spread candidates.
+- **Candidate scoring** supports continuous ADX/IV/breadth inputs per the rulebook, but the decision engine currently passes booleans only; all qualified candidates score 100.0 flat before options context adjustment.
+- **RISK_OFF regime** is defined but unreachable — `vix_defensive` is hardwired to False.
 
 ---
 

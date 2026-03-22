@@ -8,6 +8,21 @@ The watchlist should answer:
 2. Which underlyings are option-tradeable today?
 3. Which symbols deserve full options-chain strategy evaluation?
 
+## Current implementation (as of 2026-03-22)
+
+The watchlist pipeline is fully operational:
+
+```
+build_watchlist.py → build_options_watchlist.py → filter_options_watchlist.py → run_paper_live_daily.py
+```
+
+- `scripts/build_watchlist.py` — builds underlying interest watchlist from the universe
+- `scripts/build_options_watchlist.py` — adds Polygon options viability data per symbol
+- `scripts/filter_options_watchlist.py` — filters to symbols with viable options today
+- Filtered watchlist JSON is passed to the scan scripts via `--watchlist`
+
+The fixed universe is 58 symbols across all 11 GICS sectors (`config/universe_v1.yaml`).
+
 ---
 
 ## Stage 1: Underlying Watchlist

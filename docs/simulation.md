@@ -1,5 +1,7 @@
 # Simulation
 
+> This is a forward-looking spec document for future backtest/simulation work. The simulation engine is not yet built. See `go_live_phases.md` for current priorities.
+
 ## Purpose
 This document defines the baseline simulation and backtesting assumptions for `options_algo_v2`.
 

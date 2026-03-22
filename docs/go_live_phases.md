@@ -1,147 +1,156 @@
-# Go-Live Plan (Phased)
+# Go-Live Phases
 
-## Current State
-- Databento historical daily bars working in strict live
-- Polygon live options chain working
-- Strict live runner completes successfully
-- Current universe too small (10 symbols)
-- Need broader market scan + watchlist builder before options strategy execution at scale
+## Current State (as of 2026-03-22)
 
----
+All early foundation phases are complete. The platform runs a watchlist-driven paper-live pipeline with real Databento bars, real Polygon options chain, real IV/HV ratio, config-driven spread selection, options context scoring, and persistent validation logging.
 
-## Phase A — Explainability + Watchlist Foundation
-### Goals
-- Make decisions auditable
-- Prepare broader market scanning
-- Introduce watchlist-first architecture
-
-### Deliverables
-1. Add feature-level debug traces to scan artifact
-2. Add decision-trace metadata to scan artifact
-3. Add Polygon quote-quality counters
-4. Add watchlist builder skeleton
-5. Add broader-universe input support
-
-### Exit Criteria
-- Every symbol decision is explainable
-- A watchlist file can be generated from a broader underlying universe
+**Completed work:**
+- 58-symbol universe across all 11 GICS sectors
+- Live Databento bars → real SMA/ATR/ADX/RSI/HV20
+- Live Polygon options chain normalization
+- Real `iv_hv_ratio`
+- Options context snapshot (PCR, skew, expected move, chain confidence)
+- Options context score adjustment and hard-reject
+- Watchlist-driven scans (build → options-viability → filter → run)
+- Config-driven spread selection (BULL strategies)
+- Spread scoring model (delta fit, liquidity, efficiency)
+- Explainable scan artifacts with per-symbol feature debug and decision trace
+- Paper-live daily run flow with JSONL/CSV validation logging
+- Review scripts and leaderboard tooling
+- Strict-live blocking for placeholder inputs
+- 280 tests passing
 
 ---
 
-## Phase B — Broad Market Underlying Scan
-### Goals
-- Scan a larger liquid universe
-- Rank symbols before options-chain evaluation
+## Phase 1 — Complete IV Rank (current priority)
 
-### Universe
-- Start with S&P 500 + major ETFs + liquid optionable names
-- Expand later to broader optionable universe
+**Goal:** Make `iv_rank` real for all symbols so IV state classification uses actual historical percentile rank instead of the 50.0 placeholder.
 
-### Underlying Filters
-- minimum price
-- minimum average dollar volume
-- trend strength
-- momentum / directional setup
-- volatility suitability
-- breadth alignment
+**Tasks:**
+1. Wire `append_iv_proxy_observation` into `run_nightly_scan.py` — called once per symbol per live run after IV proxy is estimated
+2. Run daily until 60 observations per symbol exist
+3. Monitor `iv_rank_ready_symbols` in scan metadata
+4. Verify IV state changes when rank is real
 
-### Exit Criteria
-- Broad universe reduced to manageable candidate list
-- Watchlist saved to JSON (and later Parquet)
+**Exit criteria:**
+- `iv_rank_ready_symbols` includes all active watchlist symbols
+- `iv_rank_insufficient_history_symbols` is empty for active symbols
+- No placeholder IV rank in live scan metadata
 
 ---
 
-## Phase C — Options Viability Watchlist
-### Goals
-- Filter watchlist to symbols whose options are actually tradeable
+## Phase 2 — Bear Spread Construction
 
-### Options Viability Checks
-- options volume
-- open interest
-- bid/ask width
-- number of viable contracts near target DTE
-- real quote presence
-- greek completeness (or sparse-greek warnings)
+**Goal:** Close the gap where BEAR_CALL_SPREAD and BEAR_PUT_SPREAD signals qualify correctly but produce zero trade candidates.
 
-### Exit Criteria
-- Tradeable-options watchlist produced
-- Weak options names excluded before full v2 strategy scan
+**Tasks:**
+1. Add `BEAR_CALL_SPREAD` and `BEAR_PUT_SPREAD` handling to `expiration_aware_spread_selector.py`
+2. Add corresponding scoring functions (`score_bear_call_spread`, `score_bear_put_spread`) in `spread_scoring.py`
+3. Confirm bear spread candidates appear in artifacts when directional state is bearish
+
+**Exit criteria:**
+- Bear-regime signals produce trade candidates end-to-end
+- Spread scoring model covers all four strategy types
 
 ---
 
-## Phase D — Run v2 Algo on Watchlist
-### Goals
-- Replace 10-symbol fixed scan with watchlist-driven scan
+## Phase 3 — Scoring and Signal Quality Improvements
 
-### Deliverables
-- run_nightly_scan supports watchlist input
-- run_trade_ideas supports --watchlist path
-- strict live scan runs on watchlist symbols
+**Goal:** Make candidate scoring reflect actual signal strength rather than all qualified candidates scoring 100.0 flat.
 
-### Exit Criteria
-- v2 algo consumes watchlist-generated symbol set
+**Tasks:**
+1. Pass `adx`, `iv_ratio`, and `breadth_distance` to `score_candidate` in `decision_engine.py`
+2. Populate `iv_rv_spread` (IV proxy minus HV20) in `feature_normalizer.py` so the third IV-rich signal activates
+3. Wire `expected_move.py` into trade candidate filtering or scoring
+4. Wire `support_resistance.py` into spread strike validation
+5. Wire `regime_transition.py` into entry timing or scoring adjustments
 
----
-
-## Phase E — Strategy Calibration
-### Goals
-- Validate behavior over multiple live sessions
-
-### Tasks
-- Run strict live daily
-- Archive artifacts
-- Review pass rates, rejection reasons, trade counts
-- Tune thresholds if strategy is too strict or too noisy
-
-### Exit Criteria
-- Trade frequency and selectivity understood
-- No-trade days acceptable and explainable
+**Exit criteria:**
+- Qualified candidates score differently based on ADX strength, IV ratio, and breadth distance
+- IV_RICH classification can be triggered by any two of the three available signals
+- Expected move edge classification is used in candidate evaluation
 
 ---
 
-## Phase F — Production Hardening
-### Goals
-- Make strict live safe for production
+## Phase 4 — Production Hardening
 
-### Deliverables
-- degraded-data policy
-- strict quote-quality policy
-- breadth freshness checks
-- risk caps
-- no-trade on stale/missing data
-- monitoring and alerts
+**Goal:** Make the pipeline safe for unattended strict-live operation.
 
-### Exit Criteria
-- Strategy and data controls are enforced automatically
+**Tasks:**
+1. Breadth freshness checks — reject if market breadth data is stale
+2. Quote-quality thresholds — define and enforce minimum chain quality standards
+3. Risk cap enforcement — per-trade, per-sector, portfolio-level
+4. Monitoring hooks — structured failure logging, degraded-mode alerting
+5. Strict-live readiness checklist — explicit go/no-go criteria
 
----
-
-## Phase G — Paper Live
-### Goals
-- Simulate execution before real capital
-
-### Deliverables
-- paper execution path
-- fill/slippage assumptions
-- daily paper results
-- operator review
-
-### Exit Criteria
-- Stable paper results over multiple sessions
+**Exit criteria:**
+- Zero placeholder inputs in live scan
+- All data freshness and quality checks pass automatically
+- Strict-live runs cleanly on a full watchlist without manual intervention
 
 ---
 
-## Phase H — Small-Capital Go Live
-### Goals
-- Controlled live deployment
+## Phase 5 — Strict-Live Gate
 
-### Constraints
-- small size
-- few trades per day
-- strict risk caps
-- no synthetic-quote-dependent trades
-- manual approval optional
+**Goal:** Formally certify the system for unattended strict-live operation.
 
-### Exit Criteria
-- Stable live operations
-- Clean post-trade review
+**Readiness checklist:**
+- [ ] `iv_rank` real for all active symbols (no placeholder fallback)
+- [ ] Bear spread construction working
+- [ ] Continuous scoring inputs wired
+- [ ] Production hardening complete
+- [ ] Multiple consecutive strict-live runs clean
+- [ ] Quote-quality diagnostics passing
+- [ ] Risk caps enforced
+
+**Exit criteria:**
+- All checklist items green
+- System runs strict-live daily without intervention
+
+---
+
+## Phase 6 — Paper Execution Simulation
+
+**Goal:** Add realistic paper execution tracking before any capital is risked.
+
+**Tasks:**
+1. Paper execution path with fill/slippage assumptions
+2. Per-trade entry/exit detail logging
+3. Daily execution summary (fill rate, slippage, no-fill events)
+4. Paper P&L tracking with max-risk accounting
+
+**Exit criteria:**
+- Stable paper execution results across multiple sessions
+- Fill rate and slippage assumptions validated against live chain data
+
+---
+
+## Phase 7 — Small-Capital Live Deployment
+
+**Goal:** Controlled live deployment with minimal capital.
+
+**Constraints:**
+- Small position sizes
+- Maximum 1–2 trades per day
+- Strict risk caps (1% max risk per trade)
+- Optional manual approval per trade
+- Full post-trade review
+
+**Exit criteria:**
+- Stable live operations over multiple weeks
+- Clean post-trade review with no surprise fills or assignment events
+
+---
+
+## Daily operating loop (current)
+
+```bash
+set -a; source .env; set +a
+
+PYTHONPATH=src python scripts/run_paper_live_daily.py \
+  --watchlist data/watchlists/<filtered_watchlist>.json
+
+PYTHONPATH=src python scripts/review_paper_live_logs.py --last-runs 5
+
+PYTHONPATH=src python scripts/paper_live_symbol_leaderboard.py --last-runs 5
+```
