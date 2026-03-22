@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from datetime import UTC, datetime
@@ -8,26 +9,24 @@ from pathlib import Path
 from options_algo_v2.services.options_context_loader import load_options_context_payload
 
 
-def _parse_args(argv: list[str]) -> tuple[Path, int | None]:
-    if not argv:
-        raise SystemExit(
-            "usage: PYTHONPATH=src python scripts/filter_options_watchlist.py "
-            "data/watchlists/options_watchlist_<run_id>.json [--top-n N]"
-        )
-
-    source_path = Path(argv[0])
-    top_n: int | None = None
-
-    if len(argv) >= 3 and argv[1] == "--top-n":
-        try:
-            top_n = int(argv[2])
-        except ValueError as exc:
-            raise SystemExit("--top-n requires an integer") from exc
-
-        if top_n <= 0:
-            raise SystemExit("--top-n must be positive")
-
-    return source_path, top_n
+def _parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Filter an options watchlist and enrich it with latest options context."
+    )
+    parser.add_argument(
+        "source_path",
+        help="Path to options watchlist JSON (for example data/watchlists/options_watchlist_<run_id>.json)",
+    )
+    parser.add_argument(
+        "--top-n",
+        type=int,
+        default=None,
+        help="Keep only the top N viable rows.",
+    )
+    args = parser.parse_args(argv)
+    if args.top_n is not None and args.top_n <= 0:
+        raise SystemExit("--top-n must be positive")
+    return args
 
 
 def _load_rows(path: Path) -> list[dict[str, object]]:
@@ -166,5 +165,5 @@ def filter_options_watchlist(source_path: str, top_n: int | None = None) -> str:
 
 
 if __name__ == "__main__":
-    parsed_path, parsed_top_n = _parse_args(sys.argv[1:])
-    filter_options_watchlist(str(parsed_path), top_n=parsed_top_n)
+    args = _parse_args(sys.argv[1:])
+    filter_options_watchlist(str(args.source_path), top_n=args.top_n)

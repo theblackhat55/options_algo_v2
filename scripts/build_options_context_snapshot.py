@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from datetime import UTC, datetime
@@ -20,13 +21,20 @@ from options_algo_v2.services.options_context_sqlite_store import (
 )
 
 
-def _parse_args(argv: list[str]) -> Path:
-    if not argv:
-        raise SystemExit(
-            "usage: PYTHONPATH=src python scripts/build_options_context_snapshot.py "
-            "data/watchlists/watchlist_<run_id>.json"
-        )
-    return Path(argv[0])
+def _parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Build options-context snapshot from a base watchlist."
+    )
+    parser.add_argument(
+        "watchlist_path",
+        help="Path to base watchlist JSON (for example data/watchlists/watchlist_<run_id>.json)",
+    )
+    parser.add_argument(
+        "--db-path",
+        default="data/cache/market_history_watchlist60.db",
+        help="SQLite database path for upserting options_context_daily rows.",
+    )
+    return parser.parse_args(argv)
 
 
 def _load_watchlist_rows(path: Path) -> list[dict[str, object]]:
@@ -106,4 +114,8 @@ def _to_float(value: object) -> float | None:
 
 
 if __name__ == "__main__":
-    build_options_context_snapshot(str(_parse_args(sys.argv[1:])))
+    args = _parse_args(sys.argv[1:])
+    build_options_context_snapshot(
+        str(args.watchlist_path),
+        db_path=args.db_path,
+    )
