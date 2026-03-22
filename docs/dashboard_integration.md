@@ -12,10 +12,10 @@ These contain:
 - `generated_at`
 - `summary`
 - `runtime_metadata`
-- `decisions`
-- `trade_candidates`
-- `trade_ideas`
-- `feature_sources`
+- `decisions` — per-symbol decision trace (regime, directional state, IV state, score, rejection reasons)
+- `trade_candidates` — ranked spread candidates with spread scoring breakdown
+- `trade_ideas` — selected top candidates with full context
+- `feature_sources` — per-symbol feature debug (close, dma20, dma50, atr20, adx14, rsi14, iv_rank, iv_hv_ratio, breadth)
 
 ### Paper-live validation logs
 - `data/validation/paper_live_runs.jsonl`
@@ -51,9 +51,13 @@ The dashboard may consume these fields from latest scan runtime metadata:
 - `iv_rank_ready_symbols`
 - `iv_rank_insufficient_history_symbols`
 - `iv_rank_observation_count_by_symbol`
+- `iv_rank_trailing_observations`
+- `iv_rank_history_path`
 - `aggregate_quote_quality_counts`
 - `quote_quality_by_symbol`
 - `liquidity_debug_by_symbol`
+- `options_context_matched_count`
+- `options_context_missing_count`
 - `top_trade_candidate_symbols`
 - `trade_idea_count`
 - `trade_idea_symbols`
@@ -63,3 +67,4 @@ The dashboard may consume these fields from latest scan runtime metadata:
 - Dashboard code lives in the `trading_dashboard` repository.
 - This repository only produces filesystem artifacts under `data/...`.
 - The dashboard reads these files directly from the local filesystem.
+- No API or service boundary — file-based coupling only.

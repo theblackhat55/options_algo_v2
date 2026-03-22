@@ -1,5 +1,7 @@
 # Vision
 
+> This document describes the long-term platform vision. For current status, see `live_status_summary.md` and `go_live_phases.md`.
+
 ## Project Name
 `options_algo_v2`
 

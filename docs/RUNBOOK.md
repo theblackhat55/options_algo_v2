@@ -1,325 +1,263 @@
 # RUNBOOK
 
 ## Purpose
-This runbook explains how to operate the `options_algo_v2` platform end-to-end, from environment setup through daily paper-live use, diagnostics, validation review, and strict-live readiness checks.
+This runbook explains how to operate the `options_algo_v2` platform end-to-end: environment setup, daily paper-live runs, diagnostics, validation review, and strict-live readiness checks.
 
-It is written for an operator or developer who needs to:
-- run scans
-- build and filter watchlists
-- inspect failures
-- review paper-live logs
-- understand current readiness limits
+For a shorter daily reference, see [`OPERATOR_QUICKSTART.md`](OPERATOR_QUICKSTART.md).
 
 ---
 
 # 1. Platform Overview
 
-## What this platform does
-The platform scans underlyings, computes market/technical/volatility features, selects options spread candidates, and produces trade ideas.
+## Pipeline flow (left to right)
 
-At a high level the flow is:
-
-1. **Universe / watchlist input** — 58-symbol universe across all 11 GICS sectors
-2. **Historical feature computation**
-   - close
-   - 20-day / 50-day moving averages
-   - ATR20
-   - ADX14
-3. **Market breadth + regime context** (dead zone: 48-52%)
-4. **Options chain retrieval**
+1. **Universe / watchlist input** — 58-symbol universe (`config/universe_v1.yaml`) or a filtered watchlist JSON
+2. **Historical bars** — Databento daily OHLCV → `close`, `dma20`, `dma50`, `atr20`, `adx14`, `rsi14`, `hv20`
+3. **Market breadth + regime** — live breadth provider, dead zone 48–52%
+4. **Options chain** — Polygon live snapshots (bid/ask/mid/delta/OI/volume/IV)
 5. **Volatility context**
-   - `iv_hv_ratio` from live option IV proxy + historical vol
-   - `iv_rank` from persisted IV proxy history (60-observation lookback)
-6. **Decision engine**
-   - Directional classifier (RSI bands: 45-75 bullish / 25-55 bearish, no five_day_return hard gate)
-   - IV state classifier (asymmetric: IV_RICH requires 2-of-3 signals, IV_CHEAP requires 1)
-   - Continuous candidate scoring (ADX, IV ratio, breadth distance, momentum → 0-1 scores)
-7. **Spread selection** — config-driven DTE/delta bands from `strategy_v1.yaml`
-8. **Trade candidate ranking** — spread scoring model (delta fit, liquidity, efficiency)
-9. **Artifact generation**
-10. **Paper-live validation logging**
+   - `iv_hv_ratio` — near-ATM IV proxy ÷ HV20 (live)
+   - `iv_rank` — percentile rank over 60-observation rolling window (placeholder until history accumulates)
+6. **Market regime classifier** — TREND_UP / TREND_DOWN / RANGE_UNCLEAR / RISK_OFF
+7. **Directional state classifier** — BULLISH_CONTINUATION / BULLISH_BREAKOUT / BEARISH_CONTINUATION / BEARISH_BREAKDOWN / NEUTRAL / NO_TRADE
+8. **IV state classifier** — IV_RICH (2-of-2 active signals: `iv_rank ≥ 60` + `iv_hv_ratio ≥ 1.25`) / IV_CHEAP / IV_NORMAL
+9. **Strategy selector** — regime × directional × IV → spread type
+10. **Hard filters** — event (earnings inside holding window), liquidity, extension (2×ATR from DMA20)
+11. **Candidate score** — 100-pt: regime 20 + directional 25 + IV 20 + liquidity 20 + expected move 15; −10 if extended
+12. **Options context layer** — chain confidence, PCR, skew, expected move adjust score; untradeable chains hard-reject
+13. **Spread selection** — config-driven DTE/delta bands, spread scoring model (delta fit, liquidity, efficiency)
+14. **Trade idea generation + scan artifact**
+15. **Paper-live validation logging**
 
-### v2.1 analytical modules (available but not yet wired into main pipeline)
-- **Support/resistance validation** (`services/support_resistance.py`) — pivot-point S/R detection, strike validation
-- **Expected move comparison** (`services/expected_move.py`) — implied vs. forecast edge classification
-- **Regime transition awareness** (`services/regime_transition.py`) — transition detection, confidence, direction tracking
+## Analytical modules (implemented, not yet wired into main pipeline)
+- `services/support_resistance.py` — pivot-point S/R detection and strike validation
+- `services/expected_move.py` — implied vs. forecast expected move edge classification
+- `services/regime_transition.py` — regime transition detection, confidence, direction tracking
 
 ---
 
 # 2. Current Readiness State
 
-## Real / live inputs already in use
-- Databento historical daily bars
-- live market breadth provider
-- Polygon live options chain
-- real SMA / ATR / ADX
-- real `iv_hv_ratio`
-- persisted IV proxy history
-- watchlist-driven scans
-- paper-live validation logs and review tooling
+## Working and live
+- Databento daily bars → real SMA/ATR/ADX/RSI/HV20
+- Live Polygon options chain normalization
+- Real `iv_hv_ratio`
+- Options context snapshot (PCR, skew, expected move 1d/1w/30d, chain confidence)
+- Options context score adjustment and hard-reject for untradeable chains
+- Watchlist-driven scans
+- Config-driven spread selection (BULL strategies; see gap below)
+- Spread scoring model
+- Paper-live validation logging and review tooling
+- 280 tests passing
 
-## Still transitional
-- `iv_rank` may remain placeholder until enough daily IV history accumulates (needs 60 observations per symbol)
+## Known gaps (code-confirmed)
+| Gap | Location | Impact |
+|---|---|---|
+| `iv_rank` not auto-accumulating | `run_nightly_scan.py` imports but never calls `append_iv_proxy_observation` | IV rank stays placeholder until 60 obs/symbol exist |
+| Bear spread construction missing | `expiration_aware_spread_selector.py` only handles `BULL_PUT_SPREAD` and `BULL_CALL_SPREAD` | Bear-regime signals produce zero trade candidates |
+| `iv_rv_spread` always None | `feature_normalizer.py` passes `iv_rv_spread=None` to `classify_iv_state` | Third IV-rich signal inactive; IV_RICH requires both rank ≥ 60 AND iv_hv ≥ 1.25 |
+| Continuous scoring not used | `decision_engine.py` calls `score_candidate` with booleans only (no `adx`, `iv_ratio`, `breadth_distance`) | All qualified candidates score 100.0 before context adjustment |
+| `vix_defensive` hardwired False | `feature_normalizer.py` | RISK_OFF regime unreachable |
 
 ## Strict-live note
-Strict-live should remain blocked whenever placeholder IV inputs are still present.
+Strict-live (`OPTIONS_ALGO_STRICT_LIVE_MODE=1`) is intentionally blocked whenever placeholder IV rank inputs remain. This is a safety gate.
 
 ---
 
-# 3. Repository Structure You Will Use Most
+# 3. Repository Structure
 
-## Core scripts
-- `scripts/run_nightly_scan.py`
-- `scripts/run_trade_ideas.py`
-- `scripts/run_paper_live_daily.py`
-- `scripts/inspect_scan_debug.py`
-- `scripts/review_paper_live_logs.py`
-- `scripts/paper_live_symbol_leaderboard.py`
-- `scripts/build_watchlist.py`
-- `scripts/filter_options_watchlist.py`
-- `scripts/build_options_watchlist.py`
-- `scripts/run_strict_live_scan.py`
+## Core scripts (`scripts/`)
+| Script | Purpose |
+|---|---|
+| `run_nightly_scan.py` | Core scan entry point; returns path to scan artifact |
+| `run_trade_ideas.py` | Scan + print trade idea summary |
+| `run_paper_live_daily.py` | Scan + append validation logs |
+| `run_strict_live_scan.py` | Run with strict-live mode enforced |
+| `run_sample_scan.py` | Quick scan against mock series (no API keys) |
+| `inspect_scan_debug.py` | Per-symbol feature debug and decision trace inspector |
+| `inspect_scan_result.py` | Raw scan artifact inspector |
+| `review_paper_live_logs.py` | Multi-run pass rate, rejection reasons, regime/IV distribution |
+| `paper_live_symbol_leaderboard.py` | Per-symbol pass frequency, ADX, IV/HV profile |
+| `build_watchlist.py` | Build underlying interest watchlist |
+| `build_options_watchlist.py` | Add options viability data to watchlist |
+| `filter_options_watchlist.py` | Filter to viable options names |
+| `build_options_context_snapshot.py` | Compute and persist options context for a watchlist |
+| `show_databento_runtime_info.py` | Inspect Databento API connectivity and bar availability |
+| `debug_polygon_chain_payload.py` | Inspect raw Polygon chain response for a symbol |
+| `test_live_historical_rows.py` | Databento live connectivity smoke test |
+| `test_live_options_chain.py` | Polygon chain connectivity smoke test |
 
 ## Key config
-- `config/strategy_v1.yaml` — strategy parameters (DTE min/target/max, delta bands, breadth thresholds, IV rank min observations)
-- `config/universe_v1.yaml` — 58-symbol trading universe
+| File | Contents |
+|---|---|
+| `config/strategy_v1.yaml` | DTE bands, delta bands, breadth thresholds, IV rank min obs, extension ATR multiple |
+| `config/universe_v1.yaml` | 58-symbol universe across all 11 GICS sectors |
+| `config/risk_v1.yaml` | Min price/volume/OI, max spread, quote ages, risk per trade, max positions |
 
-## Core services
-- `services/feature_normalizer.py` — delegates to canonical classifiers
-- `services/candidate_ranker.py` — continuous scoring (ADX, IV ratio, breadth distance, momentum)
-- `services/trade_candidate_ranking.py` — spread-model-based ranking
-- `services/trade_candidate_orchestrator.py` — config-driven orchestration
-- `services/expiration_aware_spread_selector.py` — config-driven spread selection
-- `services/support_resistance.py` — S/R level detection and strike validation
-- `services/expected_move.py` — implied vs. forecast expected move comparison
-- `services/regime_transition.py` — regime transition detection and tracking
-- `services/iv_rank_history.py` — IV rank with 60-observation lookback
-
-## Key docs
-- `docs/live_status_summary.md`
-- `docs/go_live_phases.md`
-- `docs/watchlist_design.md`
-- `docs/options_watchlist_policy.md`
+## Core services (`src/options_algo_v2/services/`)
+| File | Purpose |
+|---|---|
+| `feature_normalizer.py` | Delegates to classifiers, builds `PipelineEvaluationPayload` |
+| `decision_engine.py` | Strategy selector → hard filters → score → `CandidateDecision` |
+| `candidate_ranker.py` | `score_candidate` — 100-pt scoring |
+| `options_context_decision_adjuster.py` | Chain confidence/PCR/skew score delta and hard-reject |
+| `trade_candidate_ranking.py` | Spread scoring + context ranking adjustment |
+| `spread_scoring.py` | `score_bull_put_spread` / `score_bull_call_spread` |
+| `expiration_aware_spread_selector.py` | Config-driven spread selection (BULL strategies currently) |
+| `iv_rank_history.py` | IV rank computation and history persistence |
+| `iv_feature_estimator.py` | Near-ATM IV proxy, HV20, IV/HV ratio |
+| `options_context_service.py` | Chain quality, expected move, positioning, skew, confidence |
+| `mock_historical_rows.py` | Calibrated mock price series for testing |
 
 ## Key output directories
-- `data/scan_results/`
-- `data/watchlists/`
-- `data/validation/`
-- `data/state/`
+- `data/scan_results/` — `scan_<run_id>.json` artifacts
+- `data/watchlists/` — watchlist JSON files
+- `data/validation/` — paper-live JSONL/CSV logs
+- `data/state/` — `iv_proxy_history.jsonl`
 
 ---
 
 # 4. Environment Setup
 
 ## 4.1 Python environment
-Create and activate the virtual environment if needed:
-
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-```
-
-Install dependencies according to your project's existing setup.
-
-If your repo uses editable install:
-```bash
 pip install -e .
 ```
 
-If it uses requirements:
-```bash
-pip install -r requirements.txt
-```
-
-If it uses Poetry/uv, follow the repo-standard install method.
-
----
-
 ## 4.2 Environment variables
-Load the environment before live or paper-live runs:
-
 ```bash
 set -a
 source .env
 set +a
 ```
 
-At minimum, live mode typically requires:
-- `OPTIONS_ALGO_RUNTIME_MODE=live`
-- `DATABENTO_API_KEY=...`
-- `POLYGON_API_KEY=...`
+Required for live mode:
+```
+OPTIONS_ALGO_RUNTIME_MODE=live
+DATABENTO_API_KEY=...
+POLYGON_API_KEY=...
+```
 
-Additional runtime flags may exist, including:
-- strict-live mode
-- breadth override settings
-- degraded-data policy toggles
+Optional runtime flags:
+```
+OPTIONS_ALGO_STRICT_LIVE_MODE=1          # enable strict-live blocking
+OPTIONS_ALGO_BREADTH_OVERRIDE_PCT_ABOVE_20DMA=55.0  # override breadth value
+MARKET_HISTORY_DB_PATH=data/cache/market_history_watchlist60.db  # SQLite IV history
+```
 
 ---
 
-# 5. Important Runtime Concepts
+# 5. Runtime Concepts
 
-## Runtime mode
-The platform supports at least:
-- `mock`
-- `live`
-
-Live mode uses real Databento / Polygon providers.
+## Runtime modes
+- `mock` (default) — uses mock bar series and fixed IV inputs; no API calls required
+- `live` — uses Databento + Polygon; requires API keys
 
 ## Strict-live mode
-Strict-live is designed to block runs that rely on degraded or placeholder inputs.
+Blocks runs if any of these are true:
+- `used_placeholder_iv_rank_inputs = True`
+- `used_placeholder_iv_hv_ratio_inputs = True`
+- `used_placeholder_liquidity_inputs = True`
 
-Examples of conditions that should block strict-live:
-- placeholder IV inputs
-- mock historical fallback
-- disallowed breadth override
-- future stale-data/quote-quality policies
+Use this only to verify readiness, not for normal paper-live operation.
 
 ## Degraded live mode
-A run may still complete in paper-live while marked degraded.
-
-Typical causes:
-- placeholder IV rank
+A run may still complete in paper-live while `degraded_live_mode = True`. Causes:
+- placeholder IV rank (most common currently)
 - breadth override
 - mock historical fallback
 
-This is acceptable for validation but not acceptable for true strict-live execution.
+This is acceptable for paper-live validation but not for true strict-live execution.
+
+## Options context modes
+In mock mode: missing context applies −4 score penalty (advisory only, no hard reject).
+In live mode: missing context applies −8 penalty (no hard reject unless confidence < 0.50 AND chain regime is thin/illiquid).
 
 ---
 
 # 6. Daily Operating Workflows
 
-There are three main ways to use the platform.
-
-## Workflow A — Run a direct trade-idea scan on a watchlist
-Use this when you already have a watchlist and want immediate scan/trade idea output.
+## Workflow A — Run trade ideas directly
+Use when you want immediate scan output on a watchlist.
 
 ```bash
-set -a
-source .env
-set +a
+set -a; source .env; set +a
 
 PYTHONPATH=src python scripts/run_trade_ideas.py \
   --watchlist data/watchlists/<your_watchlist>.json
 ```
 
-### What it does
-- runs the nightly scan
-- evaluates decisions using continuous scoring
-- selects spreads using config-driven DTE/delta bands
-- ranks candidates using spread scoring model (delta fit, liquidity, efficiency)
-- prints summary and trade ideas
-- writes a scan artifact under `data/scan_results/`
-
-### Typical output includes
-- run ID
-- output artifact path
-- total / passed / rejected counts
-- rejection reason counts
-- strategy type counts
-- top trade candidate symbols (ranked by spread score)
-- trade idea details
+Output: run summary, rejection reason counts, strategy type counts, top trade candidates by spread score, trade ideas if candidates pass.
 
 ---
 
-## Workflow B — Paper-live daily run (recommended daily path)
-Use this as the standard daily operational loop.
-
+## Workflow B — Paper-live daily run (standard daily path)
 ```bash
-set -a
-source .env
-set +a
+set -a; source .env; set +a
 
 PYTHONPATH=src python scripts/run_paper_live_daily.py \
   --watchlist data/watchlists/<your_watchlist>.json
 ```
 
-### What it does
-- runs a live scan on the given watchlist
-- writes the scan artifact
-- appends run-level logs to JSONL and CSV
-- appends symbol-level logs to JSONL
-
-### Validation outputs
+Appends to:
 - `data/validation/paper_live_runs.jsonl`
 - `data/validation/paper_live_symbol_decisions.jsonl`
 - `data/validation/paper_live_runs.csv`
 
-This is the main daily paper-live workflow.
-
 ---
 
 ## Workflow C — Strict-live check
-Use this only when you want to verify whether the system is ready to run without placeholder/degraded inputs.
-
-Example:
 ```bash
-set -a
-source .env
-set +a
+set -a; source .env; set +a
 
 OPTIONS_ALGO_STRICT_LIVE_MODE=1 \
 PYTHONPATH=src python scripts/run_trade_ideas.py \
   --watchlist data/watchlists/<your_watchlist>.json
 ```
 
-### Expected behavior
-- if placeholder IV inputs remain, the run should fail fast
-- if all strict-live requirements are satisfied, the run should complete
+Expected to fail while placeholder IV rank inputs remain. Treat failure as a safety gate.
 
-Do **not** treat strict-live success as automatic approval for real-money trading unless the rest of the production hardening checklist is also complete.
+---
+
+## Workflow D — Recommended daily loop
+```bash
+set -a; source .env; set +a
+
+PYTHONPATH=src python scripts/run_paper_live_daily.py \
+  --watchlist data/watchlists/<filtered_watchlist>.json
+
+PYTHONPATH=src python scripts/review_paper_live_logs.py --last-runs 5
+
+PYTHONPATH=src python scripts/paper_live_symbol_leaderboard.py --last-runs 5
+```
 
 ---
 
 # 7. Watchlist Workflow
 
-There are two practical operating modes:
-- use an existing filtered watchlist
-- build / filter watchlists as part of the daily process
-
-## 7.1 Build a broader watchlist
-If your repo supports it:
-
+## Standard flow
 ```bash
+# Step 1: build underlying interest watchlist
 PYTHONPATH=src python scripts/build_watchlist.py
-```
 
-This should generate a broader underlying-interest watchlist.
-
-## 7.2 Build options-oriented watchlist
-If applicable:
-
-```bash
+# Step 2: add options viability data
 PYTHONPATH=src python scripts/build_options_watchlist.py
-```
 
-## 7.3 Filter watchlist to viable options names
-```bash
+# Step 3: filter to viable options names
 PYTHONPATH=src python scripts/filter_options_watchlist.py
-```
 
-## 7.4 Run trade ideas on the filtered watchlist
-```bash
-PYTHONPATH=src python scripts/run_trade_ideas.py \
-  --watchlist data/watchlists/<filtered_watchlist>.json
-```
-
-## Recommended future daily flow
-```bash
-set -a
-source .env
-set +a
-
-PYTHONPATH=src python scripts/build_watchlist.py
-PYTHONPATH=src python scripts/filter_options_watchlist.py
+# Step 4: run scan on result
 PYTHONPATH=src python scripts/run_paper_live_daily.py \
   --watchlist data/watchlists/<filtered_watchlist>.json
 ```
 
 ---
 
-# 8. How to Inspect Scan Results
+# 8. Inspecting Scan Results
 
-## 8.1 Find the latest scan artifact
+## Find latest scan artifact
 ```bash
 python - <<'PY'
 from pathlib import Path
@@ -328,391 +266,224 @@ print(files[-1] if files else "no scan files found")
 PY
 ```
 
-## 8.2 Inspect the latest scan
+## Inspect per-symbol debug
 ```bash
 PYTHONPATH=src python scripts/inspect_scan_debug.py data/scan_results/<scan_file>.json
 ```
 
-### What the inspector shows
-For each symbol it may display:
-- provider source metadata
-- `close`
-- `dma20`
-- `dma50`
-- `atr20`
-- `adx14`
-- `iv_rank`
-- `iv_hv_ratio`
+Shows per symbol:
+- `close`, `dma20`, `dma50`, `atr20`, `adx14`, `rsi14`, `iv_rank`, `iv_hv_ratio`
 - `market_breadth_pct_above_20dma`
-- directional checks
-- `directional_state`
-- `market_regime`
-- `iv_state`
-- `signal_state`
-- `strategy_type`
-- `final_score` (continuous, 0-1 scale)
-- rejection reasons
-- filter results
+- directional checks (close > dma20, adx ≥ 18, RSI in range, not extended)
+- `directional_state`, `market_regime`, `iv_state`
+- `strategy_type`, `signal_state`
+- `final_score`, `min_score_required`
+- rejection reasons from each filter layer
+- options context debug (confidence, regime, PCR, expected move)
 
-This is the first tool to use when a run produces no candidates or strange behavior.
+Use this first when a run produces no candidates or unexpected behavior.
+
+## Inspect raw JSON artifact
+```bash
+python - <<'PY'
+import json
+from pathlib import Path
+files = sorted(Path("data/scan_results").glob("scan_*.json"))
+payload = json.loads(files[-1].read_text())
+print("summary:", payload["summary"])
+print("trade_ideas:", len(payload.get("trade_ideas", [])))
+rm = payload["runtime_metadata"]
+print("iv_rank_ready_symbols:", rm.get("iv_rank_ready_symbols"))
+print("iv_rank_insufficient_history_symbols:", rm.get("iv_rank_insufficient_history_symbols"))
+print("options_context_matched_count:", rm.get("options_context_matched_count"))
+PY
+```
 
 ---
 
-# 9. How to Review Paper-Live Logs
+# 9. Reviewing Paper-Live Logs
 
-## 9.1 Review recent runs
+## Recent runs summary
 ```bash
 PYTHONPATH=src python scripts/review_paper_live_logs.py --last-runs 5
 ```
 
-## 9.2 Review a specific symbol
+## Specific symbol
 ```bash
-PYTHONPATH=src python scripts/review_paper_live_logs.py \
-  --last-runs 5 \
-  --symbol XLE
+PYTHONPATH=src python scripts/review_paper_live_logs.py --last-runs 5 --symbol XLE
 ```
 
-## 9.3 Review since a date
+## Since a date
 ```bash
-PYTHONPATH=src python scripts/review_paper_live_logs.py \
-  --since-date 2026-03-11
+PYTHONPATH=src python scripts/review_paper_live_logs.py --since-date 2026-03-01
 ```
 
-### What this script helps answer
-- how many runs were logged
-- pass rate across runs
-- repeated passed symbols
-- common rejection reasons
-- directional-state distribution
-- IV state distribution
-- strategy-family mix
+Helps answer: pass rate, repeated passing symbols, rejection reason distribution, directional/IV state distribution, strategy-family mix.
 
 ---
 
-# 10. How to Use the Symbol Leaderboard
+# 10. Symbol Leaderboard
 
-## Default leaderboard
+## Default (all history)
 ```bash
 PYTHONPATH=src python scripts/paper_live_symbol_leaderboard.py
 ```
 
-## Recent runs only
+## Last N runs
 ```bash
-PYTHONPATH=src python scripts/paper_live_symbol_leaderboard.py --last-runs 5
+PYTHONPATH=src python scripts/paper_live_symbol_leaderboard.py --last-runs 10
 ```
 
-## Sort by average ADX
+## Sort by ADX or IV/HV
 ```bash
-PYTHONPATH=src python scripts/paper_live_symbol_leaderboard.py \
-  --last-runs 5 \
-  --sort-by avg_adx14
+PYTHONPATH=src python scripts/paper_live_symbol_leaderboard.py --last-runs 10 --sort-by avg_adx14
+PYTHONPATH=src python scripts/paper_live_symbol_leaderboard.py --last-runs 10 --sort-by avg_iv_hv_ratio
 ```
 
-## Sort by IV/HV ratio
-```bash
-PYTHONPATH=src python scripts/paper_live_symbol_leaderboard.py \
-  --last-runs 5 \
-  --sort-by avg_iv_hv_ratio
-```
-
-### What the leaderboard helps answer
-- which symbols repeatedly pass
-- which symbols are repeatedly neutral
-- which symbols are repeatedly bearish in an up regime
-- which symbols show strong ADX but still fail due to MA alignment
-- whether one symbol is dominating the opportunity set
+Helps answer: which symbols repeatedly pass, which are persistently neutral, ADX and IV/HV strength profiles.
 
 ---
 
-# 11. IV Rank History Operations
+# 11. IV Rank History
 
-## Where IV proxy history is stored
-```text
+## Current state
+`iv_rank` uses a 60-observation rolling percentile rank. Until 60 observations exist per symbol, the fallback is 50.0 (neutral). IV state therefore defaults to IV_NORMAL or IV_CHEAP for most symbols until history accumulates.
+
+**Important**: The live scan currently does not auto-write observations. `append_iv_proxy_observation` exists in `services/iv_rank_history.py` but is not called from `run_nightly_scan.py`. IV proxy history must be written by a separate process until this is wired in.
+
+## Storage location
+```
 data/state/iv_proxy_history.jsonl
 ```
 
-Each row represents a daily implied-vol proxy observation for a symbol.
+Each line: `{"as_of_date": "2026-03-22", "symbol": "AAPL", "implied_vol_proxy": 0.28, "source": "polygon_near_atm"}`
 
-## Inspect recent IV proxy history
+## Inspect counts
 ```bash
-tail -n 20 data/state/iv_proxy_history.jsonl
+python - <<'PY'
+import json
+from collections import Counter
+from pathlib import Path
+path = Path("data/state/iv_proxy_history.jsonl")
+if not path.exists():
+    print("no history file")
+else:
+    rows = [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
+    counts = Counter(r["symbol"] for r in rows)
+    for sym, count in sorted(counts.items()):
+        print(f"{sym}: {count} observations (need 60)")
+PY
 ```
 
-## Readiness metadata
-Recent runs should expose:
-- `iv_rank_ready_symbols`
-- `iv_rank_insufficient_history_symbols`
-- `iv_rank_history_path`
-- `iv_rank_trailing_observations`
-
-## Configuration
-The IV rank lookback is set to **60 observations** (`iv_rank_min_observations: 60` in `strategy_v1.yaml`). This means a symbol needs at least 60 daily IV proxy readings before its `iv_rank` is considered real.
-
-## Why this matters
-Even though `iv_hv_ratio` is already real, `iv_rank` requires enough daily history before it can stop falling back to placeholders.
-
-### Expected near-term behavior
-- `iv_rank_ready_symbols=[]`
-- `iv_rank_insufficient_history_symbols=[...]`
-
-### Expected later behavior
-As more days accumulate:
-- some symbols move into `iv_rank_ready_symbols`
-- placeholder IV rank usage shrinks
-- strict-live readiness improves
+## Readiness in scan metadata
+```bash
+python - <<'PY'
+import json
+from pathlib import Path
+files = sorted(Path("data/scan_results").glob("scan_*.json"))
+rm = json.loads(files[-1].read_text())["runtime_metadata"]
+print("iv_rank_ready_symbols:", rm.get("iv_rank_ready_symbols"))
+print("iv_rank_insufficient_history_symbols:", rm.get("iv_rank_insufficient_history_symbols"))
+print("observation_counts:", rm.get("iv_rank_observation_count_by_symbol"))
+PY
+```
 
 ---
 
-# 12. Recommended Daily Operator Loop
+# 12. Configuration Reference
 
-## Current recommended daily loop
-```bash
-set -a
-source .env
-set +a
+## strategy_v1.yaml — key parameters
+| Parameter | Value | Description |
+|---|---|---|
+| `breadth_bullish_threshold` | 52.0 | Breadth % above which regime is bullish |
+| `breadth_bearish_threshold` | 48.0 | Breadth % below which regime is bearish |
+| `iv_rank_min_observations` | 60 | Min observations before iv_rank is real |
+| `adx_trending_min` | 18.0 | Min ADX for directional qualification |
+| `extension_atr_multiple` | 2.0 | ATR multiples from DMA20 for extension |
+| `credit_dte_min/target/max` | 25/35/45 | DTE window for credit spreads |
+| `debit_dte_min/target/max` | 14/28/45 | DTE window for debit spreads |
+| `credit_short_delta_min/target/max` | 0.15/0.22/0.30 | Short-leg delta for credit spreads |
+| `debit_long_delta_min/target/max` | 0.45/0.55/0.65 | Long-leg delta for debit spreads |
+| `iv_rich_rank_min` | 60.0 | IV rank threshold for IV_RICH signal |
+| `iv_cheap_rank_max` | 30.0 | IV rank threshold for IV_CHEAP signal |
+| `iv_hv_rich_min` | 1.25 | IV/HV ratio threshold for IV_RICH signal |
+| `iv_hv_cheap_max` | 1.05 | IV/HV ratio threshold for IV_CHEAP signal |
 
-PYTHONPATH=src python scripts/run_paper_live_daily.py \
-  --watchlist data/watchlists/<filtered_watchlist>.json
-
-PYTHONPATH=src python scripts/review_paper_live_logs.py --last-runs 5
-
-PYTHONPATH=src python scripts/paper_live_symbol_leaderboard.py --last-runs 5
-```
-
-## What to watch daily
-- passed count
-- repeated passed symbols
-- `directional state is not actionable` frequency
-- `strategy not permitted in current regime` frequency
-- whether degraded mode is still present
-- whether placeholder IV rank symbols begin shrinking
-- continuous score distribution across candidates
+## risk_v1.yaml — key parameters
+| Parameter | Value |
+|---|---|
+| `min_underlying_price` | 20.0 |
+| `min_avg_daily_volume` | 1,000,000 |
+| `min_option_open_interest` | 250 |
+| `min_option_volume` | 50 |
+| `max_bid_ask_spread_pct` | 0.08 (8%) |
+| `max_option_quote_age_seconds` | 60 |
+| `max_underlying_quote_age_seconds` | 10 |
+| `min_candidate_score` | 70.0 |
+| `max_risk_per_trade_pct` | 1.0% |
+| `max_open_positions` | 5 |
+| `max_positions_per_sector` | 2 |
 
 ---
 
 # 13. Interpreting Common Outcomes
 
-## Case A — No candidates passed
-First inspect:
-```bash
-PYTHONPATH=src python scripts/inspect_scan_debug.py data/scan_results/<scan>.json
-```
+## No candidates passed
+Check `inspect_scan_debug.py`. Common causes:
+- all symbols NEUTRAL — ADX below 18 or RSI outside [45, 85]
+- breadth near 50% → RANGE_UNCLEAR → BULL_CALL_SPREAD rejected (only credit spreads allowed in RANGE_UNCLEAR)
+- extended symbols (close > DMA20 + 2×ATR20)
+- liquidity failures on option quotes
+- options context hard-reject (low confidence + illiquid chain in live mode)
 
-Common causes:
-- most symbols are `NEUTRAL`
-- ADX below threshold
-- `close <= dma20`
-- `dma20 <= dma50`
-- bearish continuation in an up regime
-- quote quality / viability failures (once these are fully exposed)
+## One symbol repeatedly passes
+Not a bug. Interpret as:
+- current rules produce sparse, high-conviction signals
+- that symbol has the clearest alignment in the current regime
+- avoid lowering thresholds based on a handful of runs
 
-## Case B — One symbol repeatedly passes
-This is not necessarily a bug.
+## Trade candidates exist but no trade ideas appear
+Check spread selection:
+- bear-strategy symbols currently return no trade candidates (known gap)
+- BULL_PUT / BULL_CALL spreads need eligible expirations in the 25–45 DTE window
+- options context hard-reject may have removed the candidate post-scoring
 
-Interpret it as:
-- the current rules are sparse
-- that symbol may be the clearest fit for the strategy
-- broader universe or more days may be needed before changing thresholds
-- check the continuous score — high scores (>0.7) suggest genuine signal strength
-
-## Case C — Strict-live fails
-This is expected if:
-- placeholder IV rank is still in use
-- degraded live mode is triggered
-- future hardening checks reject the run
-
-Treat strict-live failure as a **safety feature**, not a malfunction.
+## Strict-live fails
+Expected when:
+- placeholder IV rank is in use
+- `used_placeholder_iv_inputs = True` in runtime metadata
+This is a safety feature.
 
 ---
 
 # 14. Troubleshooting
 
-## 14.1 `clean_test: command not found`
-Some environments may not have the `clean_test` helper available.
+## No scan files in `data/scan_results/`
+- Confirm `.env` loaded and run completed without error
+- Check correct watchlist path
+- Confirm API keys set for live mode
 
-Use raw commands instead:
+## Live provider errors
 ```bash
-pytest
-ruff check .
-mypy src
+set -a; source .env; set +a  # always load env first
 ```
+Common causes: missing `DATABENTO_API_KEY`, missing `POLYGON_API_KEY`, live market breadth provider not configured.
 
-## 14.2 No scan files found
-Ensure the run completed successfully and wrote output to:
-```text
-data/scan_results/
-```
+## Options context missing for all symbols
+The options context is loaded from `data/validation/latest_options_context.json` if it exists. In most paper-live runs this file will not be present (it is produced by the options context pipeline, not by `run_paper_live_daily.py` directly). Missing context applies a score penalty but does not hard-reject in mock mode.
 
-## 14.3 Live provider errors
-Common causes:
-- `.env` not loaded
-- missing `DATABENTO_API_KEY`
-- missing `POLYGON_API_KEY`
-- live market breadth provider not configured
-
-Always load env before live operations:
-```bash
-set -a
-source .env
-set +a
-```
-
-## 14.4 Strict-live blocks because of placeholder IV inputs
-This is expected until `iv_rank` is fully real (60 observations per symbol).
-
-Check:
-- `iv_rank_ready_symbols`
-- `iv_rank_insufficient_history_symbols`
-- `data/state/iv_proxy_history.jsonl`
-
-## 14.5 Trade idea output looks empty or odd
-Inspect the latest scan artifact and review:
-- trade candidate fields
-- strategy family
-- option leg symbols
-- spread width / debit / credit
-- final score and rationale
-- spread scoring components (delta fit, liquidity, efficiency)
-
-Use:
-```bash
-PYTHONPATH=src python scripts/inspect_scan_debug.py data/scan_results/<scan>.json
-```
-
----
-
-# 15. Configuration Reference
-
-## strategy_v1.yaml — key parameters
-
-| Parameter | Description |
-|---|---|
-| `breadth_bullish_threshold` | Breadth % above which regime is bullish (52.0) |
-| `breadth_bearish_threshold` | Breadth % below which regime is bearish (48.0) |
-| `iv_rank_min_observations` | Minimum IV proxy observations for real iv_rank (60) |
-| `dte_min` / `dte_target` / `dte_max` | Days-to-expiration range for spread selection |
-| `call_delta_min` / `call_delta_max` | Delta band for call spread leg selection |
-| `put_delta_min` / `put_delta_max` | Delta band for put spread leg selection |
-
-## universe_v1.yaml
-Contains 58 symbols across all 11 GICS sectors. Edit this file to add or remove symbols from the scan universe.
-
----
-
-# 16. Validation / Quality Commands
-
-## Run tests
-```bash
-pytest
-```
-
-## Lint
-```bash
-ruff check .
-```
-
-## Type check
-```bash
-mypy src
-```
-
-## Recommended before pushing changes
-```bash
-pytest
-ruff check .
-mypy src
-```
-
----
-
-# 17. Git / Release Workflow
-
-## Inspect repo state
-```bash
-git status --short
-git branch --show-current
-```
-
-## Commit changes
-```bash
-git add .
-git commit -m "your commit message"
-git push origin main
-```
-
-## Recommended commit practice
-Use separate commits for:
-- feature pipeline changes
-- strict-live policy changes
-- logging/review tooling
-- docs/runbook updates
-
----
-
-# 18. Operational Boundaries
-
-## Safe to do now
-- run paper-live daily
-- inspect scan artifacts
-- review logs and leaderboard
-- accumulate IV proxy history
-- refine watchlist workflow
-- continue validation
-
-## Not yet safe to assume
-- unattended strict-live production readiness
-- small-capital live deployment
-- threshold changes based on only a handful of runs
-
----
-
-# 19. Recommended Near-Term Priorities
-
-1. Continue daily paper-live runs
-2. Let IV rank history accumulate (target: 60 observations per symbol)
-3. Watch for `iv_rank_ready_symbols` to become non-empty
-4. Wire support/resistance validation into the spread selection pipeline
-5. Wire expected move comparison into trade candidate filtering
-6. Wire regime transition signals into position sizing or entry timing
-7. Continue multi-run leaderboard/review analysis
-8. Complete remaining quote-quality and production-hardening tasks
-9. Only then re-evaluate strict-live readiness
-
----
-
-# 20. Quick Command Reference
-
-## Run trade ideas
-```bash
-PYTHONPATH=src python scripts/run_trade_ideas.py --watchlist data/watchlists/<file>.json
-```
-
-## Run paper-live daily
-```bash
-PYTHONPATH=src python scripts/run_paper_live_daily.py --watchlist data/watchlists/<file>.json
-```
-
-## Inspect latest scan
-```bash
-PYTHONPATH=src python scripts/inspect_scan_debug.py data/scan_results/<scan>.json
-```
-
-## Review paper-live logs
-```bash
-PYTHONPATH=src python scripts/review_paper_live_logs.py --last-runs 5
-```
-
-## Review symbol leaderboard
-```bash
-PYTHONPATH=src python scripts/paper_live_symbol_leaderboard.py --last-runs 5
-```
-
-## Inspect IV history
+## `iv_rank` stays placeholder
+Expected until 60 daily observations exist per symbol. Monitor with:
 ```bash
 tail -n 20 data/state/iv_proxy_history.jsonl
 ```
+or use the count script in section 11.
 
-## Validate code
+## Bear-regime candidates produce no trade ideas
+Known gap. `expiration_aware_spread_selector.py` returns `[]` for BEAR_CALL_SPREAD and BEAR_PUT_SPREAD. The signal will qualify and score correctly; it simply has no spread candidates built. Fix is pending.
+
+## `clean_test: command not found`
+Use the raw commands:
 ```bash
 pytest
 ruff check .
@@ -721,13 +492,91 @@ mypy src
 
 ---
 
-# 21. Final Operator Guidance
+# 15. Validation / Quality Commands
 
-This platform is now best treated as a **paper-live validated signal platform with growing strict-live readiness**, not yet as a fully production-ready auto-trading system.
+```bash
+pytest              # 280 tests, all should pass
+ruff check .        # lint (expect clean)
+mypy src            # type check
+```
 
-Use it to:
-- observe real signal behavior
-- measure pass frequency
-- identify repeated winners and repeated failure modes
-- accumulate enough IV history to complete real `iv_rank`
-- harden remaining production controls before any true live deployment
+Run these before pushing any code changes.
+
+---
+
+# 16. Git Workflow
+
+```bash
+git status --short
+git branch --show-current
+git add .
+git commit -m "type(scope): description"
+git push origin <branch>
+```
+
+Commit discipline: separate commits for feature pipeline changes, config changes, logging/tooling changes, and docs updates.
+
+---
+
+# 17. Operational Boundaries
+
+## Safe now
+- daily paper-live runs and artifact inspection
+- review logs and leaderboard
+- watchlist experimentation
+- strategy observation
+- IV history accumulation (manual or via a separate write process)
+
+## Not yet safe
+- unattended strict-live execution
+- bear-regime signal-to-trade pipeline (spread construction missing)
+- small-capital live deployment
+
+---
+
+# 18. Recommended Near-Term Priorities
+
+1. **Wire `append_iv_proxy_observation`** into `run_nightly_scan.py` so IV proxy history accumulates automatically every live run
+2. **Add bear spread construction** to `expiration_aware_spread_selector.py`
+3. **Populate `iv_rv_spread`** from IV proxy minus HV20 so the third IV signal activates
+4. **Pass continuous ADX/IV/breadth to `score_candidate`** in `decision_engine.py` for finer candidate differentiation
+5. **Wire `expected_move.py`** into trade candidate filtering
+6. **Wire `support_resistance.py`** into strike selection validation
+7. **Wire `regime_transition.py`** into entry scoring or timing
+8. **Continue daily paper-live validation** and accumulate IV history
+9. **Complete production hardening** (breadth freshness, quote-quality thresholds, risk caps, monitoring)
+10. **Enable strict-live** only after placeholder IV rank is eliminated
+
+---
+
+# 19. Quick Command Reference
+
+```bash
+# Load environment
+set -a; source .env; set +a
+
+# Run trade ideas
+PYTHONPATH=src python scripts/run_trade_ideas.py --watchlist data/watchlists/<file>.json
+
+# Run paper-live daily
+PYTHONPATH=src python scripts/run_paper_live_daily.py --watchlist data/watchlists/<file>.json
+
+# Inspect latest scan
+PYTHONPATH=src python scripts/inspect_scan_debug.py data/scan_results/<scan>.json
+
+# Review paper-live logs
+PYTHONPATH=src python scripts/review_paper_live_logs.py --last-runs 5
+
+# Symbol leaderboard
+PYTHONPATH=src python scripts/paper_live_symbol_leaderboard.py --last-runs 5
+
+# IV history tail
+tail -n 20 data/state/iv_proxy_history.jsonl
+
+# Validate code
+pytest && ruff check . && mypy src
+
+# Strict-live check
+OPTIONS_ALGO_STRICT_LIVE_MODE=1 PYTHONPATH=src python scripts/run_trade_ideas.py \
+  --watchlist data/watchlists/<file>.json
+```

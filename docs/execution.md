@@ -1,5 +1,7 @@
 # Execution
 
+> This is a forward-looking spec document for the MVP execution policy. No live broker integration exists yet. For current operational boundaries, see `live_status_summary.md`.
+
 ## Purpose
 This document defines the MVP execution policy for `options_algo_v2`.
 
