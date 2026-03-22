@@ -11,6 +11,7 @@ def fetch_databento_daily_rows(
     dataset: str,
     schema: str,
     api_key: str,
+    end_date: str | None = None,
 ) -> list[dict[str, object]]:
     wrapper = DatabentoHistoricalClientWrapper(api_key=api_key)
     try:
@@ -19,6 +20,7 @@ def fetch_databento_daily_rows(
             dataset=dataset,
             schema=schema,
             lookback_days=lookback_days,
+            end_date=end_date,
         )
     except TypeError as exc:
         if "lookback_days" not in str(exc):
@@ -27,6 +29,7 @@ def fetch_databento_daily_rows(
             symbol=symbol,
             dataset=dataset,
             schema=schema,
+            end_date=end_date,
         )
 
     if not rows:

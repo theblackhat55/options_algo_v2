@@ -26,9 +26,11 @@ class MockHistoricalRowProvider(HistoricalRowProvider):
         symbol: str,
         dataset: str,
         schema: str,
+        end_date: str | None = None,
     ) -> list[dict[str, object]]:
         _ = dataset
         _ = schema
+        _ = end_date
         return build_mock_historical_rows(symbol=symbol)
 
 
@@ -43,12 +45,14 @@ class DatabentoHistoricalRowProvider(HistoricalRowProvider):
         symbol: str,
         dataset: str,
         schema: str,
+        end_date: str | None = None,
     ) -> list[dict[str, object]]:
         return self.client.get_daily_rows(
             symbol=symbol,
             lookback_days=90,
             dataset=dataset,
             schema=schema,
+            end_date=end_date,
         )
 
 

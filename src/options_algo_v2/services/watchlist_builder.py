@@ -142,6 +142,7 @@ def build_watchlist_rows(
     schema: str,
     historical_row_provider_name: str,
     market_breadth_provider_name: str,
+    end_date: str | None = None,
 ) -> list[WatchlistRow]:
     rows: list[WatchlistRow] = []
 
@@ -150,6 +151,7 @@ def build_watchlist_rows(
             symbol=symbol,
             dataset=dataset,
             schema=schema,
+            end_date=end_date,
         )
         market_breadth_pct_above_20dma = _to_float(
             market_breadth_provider.get_pct_above_20dma(symbol=symbol),

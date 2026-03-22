@@ -25,6 +25,7 @@ from options_algo_v2.services.watchlist_builder import (
 def build_watchlist(
     symbols: list[str] | None = None,
     output_path_override: str | None = None,
+    end_date: str | None = None,
 ) -> str:
     runtime_mode = get_runtime_mode()
     settings = load_databento_settings()
@@ -45,6 +46,7 @@ def build_watchlist(
         schema=settings.schema,
         historical_row_provider_name=historical_row_provider_name,
         market_breadth_provider_name=market_breadth_provider_name,
+        end_date=end_date,
     )
 
     run_id = "watchlist_" + datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
@@ -98,4 +100,5 @@ if __name__ == "__main__":
     build_watchlist(
         symbols=args.symbols if args.symbols else None,
         output_path_override=args.output,
+        end_date=args.end_date,
     )

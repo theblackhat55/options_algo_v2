@@ -9,7 +9,7 @@ from options_algo_v2.services.databento_settings import DatabentoSettings
 @dataclass(frozen=True)
 class DatabentoLiveHistoricalRowClient:
     settings: DatabentoSettings
-    fetch_rows: Callable[[str, int, str, str, str], list[dict[str, object]]]
+    fetch_rows: Callable[[str, int, str, str, str, str | None], list[dict[str, object]]]
     source: str = "databento"
 
     def get_daily_rows(
@@ -19,6 +19,7 @@ class DatabentoLiveHistoricalRowClient:
         lookback_days: int,
         dataset: str,
         schema: str,
+        end_date: str | None = None,
     ) -> list[dict[str, object]]:
         raw_rows = self.fetch_rows(
             symbol,
@@ -26,6 +27,7 @@ class DatabentoLiveHistoricalRowClient:
             dataset,
             schema,
             self.settings.api_key,
+            end_date,
         )
         return self.normalize_rows(raw_rows)
 

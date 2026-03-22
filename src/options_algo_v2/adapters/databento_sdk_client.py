@@ -101,13 +101,19 @@ def _build_get_range_kwargs(
     dataset: str,
     schema: str,
     lookback_days: int = 60,
+    end_date: str | None = None,
 ) -> dict[str, object]:
     if lookback_days <= 0:
         raise ValueError("lookback_days must be positive")
 
-    end_date = _previous_business_day(datetime.now(UTC).date())
+    if end_date:
+        requested_end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+        resolved_end_date = _previous_business_day(requested_end_date)
+    else:
+        resolved_end_date = _previous_business_day(datetime.now(UTC).date())
+
     end = datetime.combine(
-        end_date,
+        resolved_end_date,
         datetime.min.time(),
         tzinfo=UTC,
     )
@@ -186,6 +192,7 @@ class DatabentoHistoricalClientWrapper:
         dataset: str,
         schema: str,
         lookback_days: int = 60,
+        end_date: str | None = None,
     ) -> list[dict[str, object]]:
         client = self.build_client()
         response = client.timeseries.get_range(
@@ -194,6 +201,7 @@ class DatabentoHistoricalClientWrapper:
                 dataset=dataset,
                 schema=schema,
                 lookback_days=lookback_days,
+                end_date=end_date,
             )
         )
         return _normalize_response_rows(response)
