@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import argparse
 import json
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -22,27 +22,10 @@ from options_algo_v2.services.watchlist_builder import (
 )
 
 
-def _parse_symbols_from_args(argv: list[str]) -> tuple[list[str] | None, Path | None]:
-    if not argv:
-        return None, None
-
-    if argv[0] == "--symbols-file":
-        if len(argv) < 2:
-            raise ValueError("--symbols-file requires a path")
-        return None, Path(argv[1])
-
-    return argv, None
-
-
-def _load_symbols_from_file(path: Path) -> list[str]:
-    return [
-        line.strip().upper()
-        for line in path.read_text().splitlines()
-        if line.strip()
-    ]
-
-
-def build_watchlist(symbols: list[str] | None = None) -> str:
+def build_watchlist(
+    symbols: list[str] | None = None,
+    output_path_override: str | None = None,
+) -> str:
     runtime_mode = get_runtime_mode()
     settings = load_databento_settings()
 
@@ -65,9 +48,13 @@ def build_watchlist(symbols: list[str] | None = None) -> str:
     )
 
     run_id = "watchlist_" + datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    output_dir = Path("data/watchlists")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / f"{run_id}.json"
+    if output_path_override:
+        output_path = Path(output_path_override)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        output_dir = Path("data/watchlists")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / f"{run_id}.json"
 
     payload = {
         "run_id": run_id,
@@ -99,10 +86,16 @@ def build_watchlist(symbols: list[str] | None = None) -> str:
 
 
 if __name__ == "__main__":
-    arg_symbols, symbols_file = _parse_symbols_from_args(sys.argv[1:])
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--symbols", nargs="*", help="Optional explicit symbol list")
+    parser.add_argument("--output", help="Optional output watchlist JSON path")
+    parser.add_argument(
+        "--end-date",
+        help="Optional end date in YYYY-MM-DD format (accepted for wrapper compatibility)",
+    )
+    args = parser.parse_args()
 
-    if symbols_file is not None:
-        symbol_list = _load_symbols_from_file(symbols_file)
-        build_watchlist(symbol_list)
-    else:
-        build_watchlist(arg_symbols)
+    build_watchlist(
+        symbols=args.symbols if args.symbols else None,
+        output_path_override=args.output,
+    )

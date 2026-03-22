@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from types import ModuleType
 from typing import Protocol, cast
 
@@ -18,6 +18,13 @@ class _DatabentoTimeseriesClient(Protocol):
 
 class _DatabentoHistoricalClient(Protocol):
     timeseries: _DatabentoTimeseriesClient
+
+
+def _previous_business_day(value: date) -> date:
+    current = value
+    while current.weekday() >= 5:
+        current -= timedelta(days=1)
+    return current
 
 
 def _load_databento_module() -> ModuleType:
@@ -98,11 +105,11 @@ def _build_get_range_kwargs(
     if lookback_days <= 0:
         raise ValueError("lookback_days must be positive")
 
-    end = datetime.now(UTC).replace(
-        hour=0,
-        minute=0,
-        second=0,
-        microsecond=0,
+    end_date = _previous_business_day(datetime.now(UTC).date())
+    end = datetime.combine(
+        end_date,
+        datetime.min.time(),
+        tzinfo=UTC,
     )
     start = end - timedelta(days=lookback_days)
 
