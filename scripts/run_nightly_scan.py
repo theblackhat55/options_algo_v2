@@ -5,6 +5,7 @@ import os
 from datetime import date
 from pathlib import Path
 
+from options_algo_v2.domain.enums import MarketRegime
 from options_algo_v2.domain.options_chain import OptionQuote, OptionsChainSnapshot
 from options_algo_v2.services.batch_evaluator import evaluate_raw_feature_batch
 from options_algo_v2.services.historical_row_provider_factory import (
@@ -44,6 +45,7 @@ from options_algo_v2.services.options_context_decision_adjuster import (
 from options_algo_v2.services.runtime_execution_settings import (
     get_runtime_execution_settings,
 )
+from options_algo_v2.services.regime_transition import detect_regime_transition
 from options_algo_v2.services.runtime_mode import get_runtime_mode
 from options_algo_v2.services.scan_artifact_orchestrator import (
     build_and_write_scan_artifact,
@@ -783,6 +785,26 @@ def _build_raw_feature_with_fallback(
     )
 
 
+
+def _infer_recent_regime_history(decisions: list[object]) -> list[MarketRegime]:
+    observed: list[MarketRegime] = []
+
+    for decision in decisions:
+        candidate = getattr(decision, "candidate", None)
+        market_regime = getattr(candidate, "market_regime", None)
+        if isinstance(market_regime, MarketRegime):
+            observed.append(market_regime)
+
+    if not observed:
+        return []
+
+    latest = observed[-1]
+    history = observed[-5:]
+    if len(history) < 5:
+        history = ([latest] * (5 - len(history))) + history
+    return history
+
+
 def run_nightly_scan(
     symbols: list[str] | None = None,
     watchlist_path: str | None = None,
@@ -908,6 +930,22 @@ def run_nightly_scan(
         decisions,
         options_context_by_symbol=options_context_by_symbol,
     )
+
+    regime_history = _infer_recent_regime_history(decisions)
+    regime_transition_payload: dict[str, object] = {}
+    if regime_history:
+        transition = detect_regime_transition(regime_history)
+        regime_transition_payload = {
+            "previous": transition.previous.value,
+            "current": transition.current.value,
+            "is_transition": transition.is_transition,
+            "is_improving": transition.is_improving,
+            "is_degrading": transition.is_degrading,
+            "days_in_current": transition.days_in_current,
+            "confidence": round(float(transition.confidence), 4),
+            "history": [item.value for item in regime_history],
+        }
+
     artifact_result = build_and_write_scan_artifact(
         decisions=decisions,
         degraded_metadata={
@@ -941,6 +979,7 @@ def run_nightly_scan(
             "options_context_run_id": options_context_payload.get("run_id"),
             "options_context_by_symbol": options_context_by_symbol,
             "options_context_decision_debug_by_symbol": options_context_decision_debug,
+            "regime_transition": regime_transition_payload,
             "degraded_live_mode": degraded_live_mode,
             **options_context_summary,
         },
@@ -1020,6 +1059,9 @@ def run_nightly_scan(
     print(f"strategy_type_counts={summary['strategy_type_counts']}")
     print(f"historical_provider_modes={historical_provider_modes}")
     print(f"breadth_override_symbols={breadth_override_symbols}")
+    regime_transition = runtime_metadata.get("regime_transition", {})
+    if regime_transition:
+        print(f"regime_transition={regime_transition}")
     low_confidence_symbols = runtime_metadata.get(
         "options_context_low_confidence_symbols", []
     )
