@@ -18,7 +18,7 @@ def passes_bull_put_delta_filter(candidate: TradeCandidate) -> bool:
 
 
 def passes_debit_width_filter(candidate: TradeCandidate) -> bool:
-    if candidate.strategy_family != "BULL_CALL_SPREAD":
+    if candidate.strategy_family not in {"BULL_CALL_SPREAD", "BEAR_PUT_SPREAD"}:
         return True
     if candidate.width <= 0:
         return False
@@ -26,7 +26,7 @@ def passes_debit_width_filter(candidate: TradeCandidate) -> bool:
 
 
 def passes_credit_width_filter(candidate: TradeCandidate) -> bool:
-    if candidate.strategy_family != "BULL_PUT_SPREAD":
+    if candidate.strategy_family not in {"BULL_PUT_SPREAD", "BEAR_CALL_SPREAD"}:
         return True
     if candidate.width <= 0:
         return False

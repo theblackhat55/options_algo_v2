@@ -26,10 +26,10 @@ def _score_serialized_trade_candidate(item: dict[str, object]) -> float:
     if width <= 0:
         return 0.0
 
-    if strategy_family == "BULL_PUT_SPREAD":
+    if strategy_family in {"BULL_PUT_SPREAD", "BEAR_CALL_SPREAD"}:
         return round(min(1.0, net_credit / width), 4)
 
-    if strategy_family == "BULL_CALL_SPREAD":
+    if strategy_family in {"BULL_CALL_SPREAD", "BEAR_PUT_SPREAD"}:
         return round(max(0.0, 1.0 - (net_debit / width)), 4)
 
     return 0.0

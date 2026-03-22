@@ -73,7 +73,7 @@ def score_trade_candidate(candidate: dict[str, object]) -> float:
     if width <= 0.0:
         return 0.0
 
-    if strategy_family == "BULL_PUT_SPREAD":
+    if strategy_family in {"BULL_PUT_SPREAD", "BEAR_CALL_SPREAD"}:
         short_leg_delta = float(candidate.get("short_delta", 0.0) or 0.0)
         short_leg_oi = int(candidate.get("short_open_interest", 0) or 0)
         net_credit = float(candidate.get("net_credit", 0.0) or 0.0)
@@ -91,7 +91,7 @@ def score_trade_candidate(candidate: dict[str, object]) -> float:
         base = net_credit / width if width > 0 else 0.0
         return base + _options_context_ranking_adjustment(candidate)
 
-    if strategy_family == "BULL_CALL_SPREAD":
+    if strategy_family in {"BULL_CALL_SPREAD", "BEAR_PUT_SPREAD"}:
         long_leg_delta = float(candidate.get("long_delta", 0.0) or 0.0)
         long_leg_oi = int(candidate.get("long_open_interest", 0) or 0)
         net_debit = float(candidate.get("net_debit", 0.0) or 0.0)
