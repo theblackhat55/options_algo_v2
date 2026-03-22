@@ -617,7 +617,7 @@ def _build_raw_feature_with_fallback(
                 schema=schema,
                 provider=row_provider,
                 iv_rank=70.0 if is_bullish else 45.0,
-                iv_hv_ratio=1.30 if is_bullish else 1.10,
+                iv_hv_ratio=1.50 if is_bullish else 1.10,
                 avg_daily_volume=8_000_000.0 if is_bullish else 5_000_000.0,
                 option_open_interest=2500 if is_bullish else 1800,
                 option_volume=800 if is_bullish else 500,
@@ -656,7 +656,7 @@ def _build_raw_feature_with_fallback(
                 schema=schema,
                 provider=fallback_provider,
                 iv_rank=70.0 if is_bullish else 45.0,
-                iv_hv_ratio=1.30 if is_bullish else 1.10,
+                iv_hv_ratio=1.50 if is_bullish else 1.10,
                 avg_daily_volume=8_000_000.0 if is_bullish else 5_000_000.0,
                 option_open_interest=2500 if is_bullish else 1800,
                 option_volume=800 if is_bullish else 500,
@@ -823,16 +823,29 @@ def run_nightly_scan(
     breadth_provider = build_market_breadth_provider()
     options_chain_provider = build_options_chain_provider()
 
-    options_context_payload = load_options_context_payload()
-    options_context_index = build_options_context_index(options_context_payload)
-    options_context_by_symbol = build_options_context_by_symbol(
-        selected_symbols,
-        options_context_index,
-    )
-    options_context_summary = summarize_options_context_coverage(
-        selected_symbols,
-        options_context_index,
-    )
+    if get_runtime_mode() == "mock":
+        options_context_payload = {
+            "source": "mock",
+            "row_count": 0,
+            "rows": [],
+        }
+        options_context_index = {}
+        options_context_by_symbol = {}
+        options_context_summary = summarize_options_context_coverage(
+            selected_symbols,
+            options_context_index,
+        )
+    else:
+        options_context_payload = load_options_context_payload()
+        options_context_index = build_options_context_index(options_context_payload)
+        options_context_by_symbol = build_options_context_by_symbol(
+            selected_symbols,
+            options_context_index,
+        )
+        options_context_summary = summarize_options_context_coverage(
+            selected_symbols,
+            options_context_index,
+        )
 
     raw_features = []
     historical_provider_modes: dict[str, str] = {}
@@ -926,10 +939,13 @@ def run_nightly_scan(
     history_path = Path(os.getenv("MARKET_HISTORY_DB_PATH", "data/cache/market_history_watchlist60.db"))
 
     decisions = evaluate_raw_feature_batch(raw_features)
-    decisions, options_context_decision_debug = apply_options_context_to_decisions(
-        decisions,
-        options_context_by_symbol=options_context_by_symbol,
-    )
+    if get_runtime_mode() == "mock":
+        options_context_decision_debug = {}
+    else:
+        decisions, options_context_decision_debug = apply_options_context_to_decisions(
+            decisions,
+            options_context_by_symbol=options_context_by_symbol,
+        )
 
     regime_history = _infer_recent_regime_history(decisions)
     regime_transition_payload: dict[str, object] = {}
