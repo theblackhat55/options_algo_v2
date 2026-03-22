@@ -56,10 +56,24 @@ def test_selects_bear_put_spread_for_bearish_cheap_iv() -> None:
     assert candidate.signal_state == SignalState.QUALIFIED
 
 
-def test_rejects_range_unclear_regime() -> None:
+def test_range_unclear_allows_defined_risk_spreads() -> None:
+    # RANGE_UNCLEAR now permits defined-risk spreads (bull put, bear call, bear put)
     candidate = select_strategy_candidate(
         symbol="SPY",
         market_regime=MarketRegime.RANGE_UNCLEAR,
+        directional_state=DirectionalState.BULLISH_CONTINUATION,
+        iv_state=IVState.IV_RICH,
+    )
+
+    assert candidate.signal_state == SignalState.QUALIFIED
+    assert candidate.strategy_type == StrategyType.BULL_PUT_SPREAD
+
+
+def test_rejects_risk_off_regime_regardless_of_direction() -> None:
+    # RISK_OFF still rejects all strategies
+    candidate = select_strategy_candidate(
+        symbol="SPY",
+        market_regime=MarketRegime.RISK_OFF,
         directional_state=DirectionalState.BULLISH_CONTINUATION,
         iv_state=IVState.IV_RICH,
     )

@@ -45,6 +45,7 @@ src/options_algo_v2/domain/raw_features.py
 src/options_algo_v2/domain/scan_result.py
 src/options_algo_v2/domain/trade_candidate.py
 src/options_algo_v2/domain/underlying_data.py
+src/options_algo_v2/models/options_context.py
 src/options_algo_v2/services/__init__.py
 src/options_algo_v2/services/bar_history_builder.py
 src/options_algo_v2/services/batch_evaluator.py
@@ -62,6 +63,7 @@ src/options_algo_v2/services/decision_serializer.py
 src/options_algo_v2/services/decision_spread_mapper.py
 src/options_algo_v2/services/decision_spread_selector.py
 src/options_algo_v2/services/event_filter.py
+src/options_algo_v2/services/expected_move.py
 src/options_algo_v2/services/expiration_aware_spread_selector.py
 src/options_algo_v2/services/extension_filter.py
 src/options_algo_v2/services/feature_computation.py
@@ -78,6 +80,11 @@ src/options_algo_v2/services/market_breadth_fetcher.py
 src/options_algo_v2/services/market_breadth_provider_factory.py
 src/options_algo_v2/services/mock_historical_rows.py
 src/options_algo_v2/services/options_chain_provider_factory.py
+src/options_algo_v2/services/options_context_decision_adjuster.py
+src/options_algo_v2/services/options_context_integration.py
+src/options_algo_v2/services/options_context_loader.py
+src/options_algo_v2/services/options_context_service.py
+src/options_algo_v2/services/options_context_store.py
 src/options_algo_v2/services/options_delta_selector.py
 src/options_algo_v2/services/options_dte_selector.py
 src/options_algo_v2/services/options_expiration_selector.py
@@ -88,6 +95,7 @@ src/options_algo_v2/services/pipeline_evaluator.py
 src/options_algo_v2/services/polygon_settings.py
 src/options_algo_v2/services/qualified_trade_candidate_builder.py
 src/options_algo_v2/services/raw_feature_builder.py
+src/options_algo_v2/services/regime_transition.py
 src/options_algo_v2/services/rulebook_policy.py
 src/options_algo_v2/services/run_id.py
 src/options_algo_v2/services/runtime_execution_settings.py
@@ -102,6 +110,7 @@ src/options_algo_v2/services/spread_quality_filters.py
 src/options_algo_v2/services/spread_scoring.py
 src/options_algo_v2/services/spread_selection_filters.py
 src/options_algo_v2/services/strategy_selector.py
+src/options_algo_v2/services/support_resistance.py
 src/options_algo_v2/services/top_trade_summary_builder.py
 src/options_algo_v2/services/trade_candidate_builder.py
 src/options_algo_v2/services/trade_candidate_diagnostics.py

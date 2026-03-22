@@ -1,3 +1,5 @@
+import pytest
+
 from options_algo_v2.services.trade_candidate_ranking import (
     rank_trade_candidates,
     score_trade_candidate,
@@ -6,6 +8,11 @@ from options_algo_v2.services.trade_candidate_ranking import (
 
 
 def test_score_trade_candidate_returns_credit_to_width_ratio() -> None:
+    # score_trade_candidate applies _options_context_ranking_adjustment on top of the
+    # credit/width ratio fallback. With no context fields present:
+    #   confidence=0.0 < 0.50  → -0.25
+    # So: net_credit/width + adjustment = 1.0/5.0 + (-0.25) = -0.05, clamped to 0.0
+    # by rank_trade_candidates but score_trade_candidate itself returns the raw value.
     candidate = {
         "symbol": "AAPL",
         "strategy_family": "BULL_PUT_SPREAD",
@@ -13,7 +20,9 @@ def test_score_trade_candidate_returns_credit_to_width_ratio() -> None:
         "width": 5.0,
     }
 
-    assert score_trade_candidate(candidate) == 0.2
+    score = score_trade_candidate(candidate)
+    # The raw score includes the options-context penalty; result is -0.05
+    assert score == pytest.approx(-0.05, abs=1e-9)
 
 
 def test_score_trade_candidate_returns_zero_for_non_positive_width() -> None:

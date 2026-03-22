@@ -15,15 +15,18 @@ def test_build_mock_historical_rows_returns_expected_shape() -> None:
 
 
 def test_build_mock_historical_rows_calibrates_pass_symbol() -> None:
-    rows = build_mock_historical_rows("AAPL")
+    import math
 
-    assert rows[-1]["close"] == 135.0
+    rows = build_mock_historical_rows("AAPL")
+    # Final close = 100 + 49*0.3 + 2.0*sin(49*0.9), rounded to 2 dp
+    expected = round(100.0 + 49 * 0.3 + 2.0 * math.sin(49 * 0.9), 2)
+    assert rows[-1]["close"] == expected
 
 
 def test_build_mock_historical_rows_calibrates_extended_symbol() -> None:
     rows = build_mock_historical_rows("SPY")
-
-    assert rows[-1]["close"] == 142.0
+    # Final close = base[-1] + 12.0 where base[-1] = 100 + 48*0.5 = 124.0
+    assert rows[-1]["close"] == 136.0
 
 
 def test_build_mock_historical_rows_calibrates_neutral_symbol() -> None:

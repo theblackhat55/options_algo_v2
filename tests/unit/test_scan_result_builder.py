@@ -36,10 +36,11 @@ def _make_passed_decision():
 
 
 def _make_rejected_decision():
+    # NEUTRAL directional state is always rejected regardless of regime
     evaluation_input = CandidateEvaluationInput(
         symbol="SPY",
-        market_regime=MarketRegime.RANGE_UNCLEAR,
-        directional_state=DirectionalState.BULLISH_CONTINUATION,
+        market_regime=MarketRegime.TREND_UP,
+        directional_state=DirectionalState.NEUTRAL,
         iv_state=IVState.IV_RICH,
         earnings_date=None,
         planned_latest_exit=date(2026, 3, 20),
@@ -69,7 +70,7 @@ def test_build_scan_summary_counts_passed_and_rejected() -> None:
     assert summary.passed_symbols == ["AAPL"]
     assert summary.rejected_symbols == ["SPY"]
     assert summary.rejection_reason_counts == {
-        "market regime does not permit new entries": 1,
+        "directional state is not actionable": 1,
     }
     assert summary.signal_state_counts == {"QUALIFIED": 1, "REJECTED": 1}
     assert summary.strategy_type_counts == {
@@ -134,7 +135,7 @@ def test_build_scan_result_returns_expected_structure(monkeypatch: pytest.Monkey
     assert result.runtime_metadata["top_trade_summary_rows"][0]["symbol"] == "AAPL"
     assert result.summary.total_candidates == 2
     assert result.summary.rejection_reason_counts == {
-        "market regime does not permit new entries": 1,
+        "directional state is not actionable": 1,
     }
     assert result.summary.signal_state_counts == {"QUALIFIED": 1, "REJECTED": 1}
     assert result.summary.strategy_type_counts == {

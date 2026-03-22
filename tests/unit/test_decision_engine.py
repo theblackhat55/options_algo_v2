@@ -100,6 +100,8 @@ def test_decision_engine_rejects_for_liquidity_failure() -> None:
 
 
 def test_decision_engine_rejects_for_extension_failure() -> None:
+    # close=105.0, dma20=100.0, atr20=2.0, extension_atr_multiple=2.0
+    # 105 - 100 = 5.0 > 2.0 * 2.0 = 4.0 → clearly extended
     evaluation_input = CandidateEvaluationInput(
         symbol="NVDA",
         market_regime=MarketRegime.TREND_UP,
@@ -115,7 +117,7 @@ def test_decision_engine_rejects_for_extension_failure() -> None:
         ask=2.55,
         option_quote_age_seconds=10,
         underlying_quote_age_seconds=2,
-        close=104.0,
+        close=105.0,
         dma20=100.0,
         atr20=2.0,
         expected_move_fit=True,
@@ -128,10 +130,11 @@ def test_decision_engine_rejects_for_extension_failure() -> None:
 
 
 def test_decision_engine_returns_zero_score_for_selector_rejection() -> None:
+    # NEUTRAL directional state is always rejected regardless of regime
     evaluation_input = CandidateEvaluationInput(
         symbol="SPY",
-        market_regime=MarketRegime.RANGE_UNCLEAR,
-        directional_state=DirectionalState.BULLISH_CONTINUATION,
+        market_regime=MarketRegime.TREND_UP,
+        directional_state=DirectionalState.NEUTRAL,
         iv_state=IVState.IV_RICH,
         earnings_date=None,
         planned_latest_exit=date(2026, 3, 20),
