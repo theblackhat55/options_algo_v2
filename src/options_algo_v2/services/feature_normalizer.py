@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from options_algo_v2.services.expected_move import compare_expected_moves
 from options_algo_v2.classifiers.directional_state import classify_directional_state
 from options_algo_v2.classifiers.iv_state import classify_iv_state
 from options_algo_v2.classifiers.market_regime import classify_market_regime
@@ -19,6 +20,12 @@ def normalize_raw_features_to_payload(
 ) -> PipelineEvaluationPayload:
     """Convert raw features into a pipeline payload using the canonical classifiers."""
 
+    inferred_vix_defensive = (
+        raw.market_breadth_pct_above_20dma < 35.0
+        and raw.close < raw.dma20
+        and raw.dma20 < raw.dma50
+    )
+
     market_regime = classify_market_regime(
         MarketRegimeFeatures(
             spy_close_above_20dma=raw.close > raw.dma20,
@@ -26,15 +33,19 @@ def normalize_raw_features_to_payload(
             spy_close_below_20dma=raw.close < raw.dma20,
             spy_20dma_below_50dma=raw.dma20 < raw.dma50,
             breadth_pct_above_20dma=raw.market_breadth_pct_above_20dma,
-            vix_defensive=False,
+            vix_defensive=inferred_vix_defensive,
         )
     )
+
+    iv_rv_spread = None
+    if raw.iv_hv_ratio is not None:
+        iv_rv_spread = (raw.iv_hv_ratio - 1.0) * 100.0
 
     iv_state = classify_iv_state(
         IVFeatures(
             iv_rank=raw.iv_rank,
             iv_hv_ratio=raw.iv_hv_ratio,
-            iv_rv_spread=None,
+            iv_rv_spread=iv_rv_spread,
         )
     )
 
@@ -65,7 +76,14 @@ def normalize_raw_features_to_payload(
     )
 
     planned_latest_exit = raw.entry_date + timedelta(days=min(raw.dte_days, 21))
-    expected_move_fit = abs(raw.close - raw.dma20) <= (2.0 * raw.atr20)
+
+    expected_move_comparison = compare_expected_moves(
+        atm_iv=max(raw.iv_hv_ratio * 0.20, 0.01),
+        dte_days=max(min(raw.dte_days, 21), 1),
+        atr20=raw.atr20,
+        close=raw.close,
+    )
+    expected_move_fit = expected_move_comparison.edge != "neutral"
 
     return PipelineEvaluationPayload(
         symbol=raw.symbol,

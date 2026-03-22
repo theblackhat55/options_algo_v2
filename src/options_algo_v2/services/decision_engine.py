@@ -66,6 +66,9 @@ def evaluate_candidate_decision(
 
     final_score = 0.0
     if selector_passed:
+        breadth_distance = abs(float(evaluation_input.market_breadth_pct_above_20dma) - 50.0)
+        momentum_score = 1.0 if evaluation_input.expected_move_fit else 0.0
+
         final_score = score_candidate(
             regime_fit=True,
             directional_fit=True,
@@ -73,6 +76,10 @@ def evaluate_candidate_decision(
             liquidity_fit=liquidity_result.passed,
             expected_move_fit=evaluation_input.expected_move_fit,
             is_extended=not extension_result.passed,
+            adx=float(evaluation_input.adx14),
+            iv_ratio=float(evaluation_input.iv_hv_ratio),
+            breadth_distance=breadth_distance,
+            momentum_score=momentum_score,
         )
 
     rejection_reasons: list[str] = []

@@ -17,6 +17,8 @@ from options_algo_v2.services.options_expiration_selector import (
 )
 from options_algo_v2.services.options_spread_selector import (
     VerticalSpreadCandidate,
+    select_vertical_bear_call_spread_candidates,
+    select_vertical_bear_put_spread_candidates,
     select_vertical_call_spread_candidates,
     select_vertical_put_spread_candidates,
 )
@@ -89,6 +91,20 @@ def select_spread_candidates_across_expirations(
                     expiration=expiration,
                 )
             )
+        elif strategy_family == "BEAR_CALL_SPREAD":
+            selected_candidates.extend(
+                select_vertical_bear_call_spread_candidates(
+                    chain=filtered_chain,
+                    expiration=expiration,
+                )
+            )
+        elif strategy_family == "BEAR_PUT_SPREAD":
+            selected_candidates.extend(
+                select_vertical_bear_put_spread_candidates(
+                    chain=filtered_chain,
+                    expiration=expiration,
+                )
+            )
 
     return selected_candidates
 
@@ -104,7 +120,7 @@ def _filter_quotes_for_strategy(
 ) -> list[OptionQuote]:
     execution_settings = get_runtime_execution_settings()
 
-    if strategy_family == "BULL_CALL_SPREAD":
+    if strategy_family in {"BULL_CALL_SPREAD", "BEAR_CALL_SPREAD"}:
         calls = [
             quote for quote in quotes if str(quote.option_type).lower() == "call"
         ]
@@ -119,7 +135,7 @@ def _filter_quotes_for_strategy(
             return calls
         return []
 
-    if strategy_family == "BULL_PUT_SPREAD":
+    if strategy_family in {"BULL_PUT_SPREAD", "BEAR_PUT_SPREAD"}:
         puts = [
             quote for quote in quotes if str(quote.option_type).lower() == "put"
         ]
