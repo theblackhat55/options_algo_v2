@@ -31,6 +31,9 @@ def summarize_options_context_coverage(
     low_confidence_symbols: list[str] = []
     expected_move_leaders: list[dict[str, Any]] = []
     skew_leaders: list[dict[str, Any]] = []
+    gamma_flip_risk_leaders: list[dict[str, Any]] = []
+    gex_leaders: list[dict[str, Any]] = []
+    front_gamma_leaders: list[dict[str, Any]] = []
 
     for symbol in matched:
         row = context_index[symbol]
@@ -53,6 +56,24 @@ def summarize_options_context_coverage(
                 {"symbol": symbol, "skew_25d_put_call_ratio": skew_ratio}
             )
 
+        gamma_flip_distance = _to_float(row.get("distance_to_gamma_flip_pct"))
+        if gamma_flip_distance is not None:
+            gamma_flip_risk_leaders.append(
+                {"symbol": symbol, "distance_to_gamma_flip_pct": gamma_flip_distance}
+            )
+
+        gex_value = _to_float(row.get("gex_per_1pct_move"))
+        if gex_value is not None:
+            gex_leaders.append(
+                {"symbol": symbol, "gex_per_1pct_move": gex_value}
+            )
+
+        front_gamma_value = _to_float(row.get("nearest_expiry_gamma_pct"))
+        if front_gamma_value is not None:
+            front_gamma_leaders.append(
+                {"symbol": symbol, "nearest_expiry_gamma_pct": front_gamma_value}
+            )
+
     expected_move_leaders = sorted(
         expected_move_leaders,
         key=lambda item: item["expected_move_1d_pct"],
@@ -61,6 +82,20 @@ def summarize_options_context_coverage(
     skew_leaders = sorted(
         skew_leaders,
         key=lambda item: item["skew_25d_put_call_ratio"],
+        reverse=True,
+    )[:5]
+    gamma_flip_risk_leaders = sorted(
+        gamma_flip_risk_leaders,
+        key=lambda item: item["distance_to_gamma_flip_pct"],
+    )[:5]
+    gex_leaders = sorted(
+        gex_leaders,
+        key=lambda item: abs(item["gex_per_1pct_move"]),
+        reverse=True,
+    )[:5]
+    front_gamma_leaders = sorted(
+        front_gamma_leaders,
+        key=lambda item: item["nearest_expiry_gamma_pct"],
         reverse=True,
     )[:5]
 
@@ -73,6 +108,9 @@ def summarize_options_context_coverage(
         "options_context_low_confidence_symbols": low_confidence_symbols[:20],
         "options_context_top_expected_move_symbols": expected_move_leaders,
         "options_context_top_skew_symbols": skew_leaders,
+        "options_context_top_gamma_flip_risk_symbols": gamma_flip_risk_leaders,
+        "options_context_top_gex_symbols": gex_leaders,
+        "options_context_top_front_gamma_symbols": front_gamma_leaders,
     }
 
 
@@ -115,6 +153,11 @@ def build_options_context_by_symbol(
             "nonzero_open_interest_ratio": row.get("nonzero_open_interest_ratio"),
             "nonzero_delta_ratio": row.get("nonzero_delta_ratio"),
             "nonzero_iv_ratio": row.get("nonzero_iv_ratio"),
+            "max_gamma_strike": row.get("max_gamma_strike"),
+            "gamma_flip_estimate": row.get("gamma_flip_estimate"),
+            "distance_to_gamma_flip_pct": row.get("distance_to_gamma_flip_pct"),
+            "gex_per_1pct_move": row.get("gex_per_1pct_move"),
+            "nearest_expiry_gamma_pct": row.get("nearest_expiry_gamma_pct"),
             "options_summary_regime": row.get("options_summary_regime"),
             "confidence_score": row.get("confidence_score"),
             "reason_codes": [],

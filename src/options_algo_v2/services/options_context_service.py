@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import UTC, datetime, date
-from math import inf
+from math import exp, inf, log, pi, sqrt
 from typing import Iterable
 
 from options_algo_v2.domain.options_chain import OptionQuote, OptionsChainSnapshot
 from options_algo_v2.models.options_context import (
     ExpectedMoveSnapshot,
+    GammaStructureSnapshot,
     OptionsContextSnapshot,
     PositioningSnapshot,
     SkewSnapshot,
@@ -108,6 +109,138 @@ def compute_skew_metrics(
     )
 
 
+
+
+def _std_normal_pdf(x: float) -> float:
+    return exp(-0.5 * x * x) / sqrt(2.0 * pi)
+
+
+def _estimate_black_scholes_gamma(
+    *,
+    spot_price: float,
+    strike: float,
+    time_to_expiry_years: float,
+    implied_volatility: float,
+) -> float | None:
+    if (
+        spot_price <= 0
+        or strike <= 0
+        or time_to_expiry_years <= 0
+        or implied_volatility <= 0
+    ):
+        return None
+
+    sigma_sqrt_t = implied_volatility * sqrt(time_to_expiry_years)
+    if sigma_sqrt_t <= 0:
+        return None
+
+    try:
+        d1 = (
+            log(spot_price / strike) + 0.5 * implied_volatility * implied_volatility * time_to_expiry_years
+        ) / sigma_sqrt_t
+    except ValueError:
+        return None
+
+    denom = spot_price * sigma_sqrt_t
+    if denom <= 0:
+        return None
+
+    return _std_normal_pdf(d1) / denom
+
+
+def compute_gamma_structure_metrics(
+    *,
+    spot_price: float | None,
+    chain: OptionsChainSnapshot,
+) -> GammaStructureSnapshot:
+    if spot_price is None or spot_price <= 0 or not chain.quotes:
+        return GammaStructureSnapshot()
+
+    today = datetime.now(UTC).date()
+
+    strike_gex: dict[float, float] = {}
+    expiry_abs_gex: dict[date, float] = {}
+    total_abs_gex = 0.0
+    total_net_gex = 0.0
+
+    for quote in chain.quotes:
+        expiry = _parse_expiration_date(quote.expiration)
+        if expiry is None:
+            continue
+
+        dte_days = (expiry - today).days
+        if dte_days < 0:
+            continue
+
+        time_to_expiry_years = max(dte_days, 1) / 365.0
+        iv = quote.implied_volatility
+        if iv is None or iv <= 0:
+            continue
+
+        open_interest = max(int(quote.open_interest or 0), 0)
+        if open_interest <= 0:
+            continue
+
+        gamma = _estimate_black_scholes_gamma(
+            spot_price=spot_price,
+            strike=float(quote.strike),
+            time_to_expiry_years=time_to_expiry_years,
+            implied_volatility=float(iv),
+        )
+        if gamma is None or gamma <= 0:
+            continue
+
+        sign = 1.0 if quote.option_type == "CALL" else -1.0
+
+        # proxy "gamma exposure per 1% move"
+        gex = sign * gamma * open_interest * 100.0 * spot_price * spot_price * 0.01
+
+        strike_key = float(quote.strike)
+        strike_gex[strike_key] = strike_gex.get(strike_key, 0.0) + gex
+        expiry_abs_gex[expiry] = expiry_abs_gex.get(expiry, 0.0) + abs(gex)
+        total_abs_gex += abs(gex)
+        total_net_gex += gex
+
+    if not strike_gex:
+        return GammaStructureSnapshot()
+
+    max_gamma_strike = max(
+        strike_gex.items(),
+        key=lambda item: abs(item[1]),
+    )[0]
+
+    gamma_flip_estimate = None
+    ordered = sorted(strike_gex.items())
+    for (strike_a, gex_a), (strike_b, gex_b) in zip(ordered, ordered[1:]):
+        if gex_a == 0:
+            gamma_flip_estimate = strike_a
+            break
+        if gex_a * gex_b < 0:
+            # linear interpolation of sign crossing
+            denom = abs(gex_a) + abs(gex_b)
+            if denom > 0:
+                weight = abs(gex_a) / denom
+                gamma_flip_estimate = strike_a + (strike_b - strike_a) * weight
+            else:
+                gamma_flip_estimate = strike_a
+            break
+
+    distance_to_gamma_flip_pct = None
+    if gamma_flip_estimate is not None and spot_price > 0:
+        distance_to_gamma_flip_pct = abs(spot_price - gamma_flip_estimate) / spot_price
+
+    nearest_expiry_gamma_pct = None
+    if expiry_abs_gex and total_abs_gex > 0:
+        nearest_expiry = min(expiry_abs_gex.keys())
+        nearest_expiry_gamma_pct = expiry_abs_gex[nearest_expiry] / total_abs_gex
+
+    return GammaStructureSnapshot(
+        max_gamma_strike=max_gamma_strike,
+        gamma_flip_estimate=gamma_flip_estimate,
+        distance_to_gamma_flip_pct=distance_to_gamma_flip_pct,
+        gex_per_1pct_move=total_net_gex,
+        nearest_expiry_gamma_pct=nearest_expiry_gamma_pct,
+    )
 
 
 def compute_chain_quality_metrics(
@@ -216,6 +349,7 @@ def compute_options_context_snapshot(
     expected_move = compute_expected_moves(spot_price=spot_price, chain=chain)
     positioning = compute_positioning_metrics(chain=chain)
     skew = compute_skew_metrics(spot_price=spot_price, chain=chain)
+    gamma = compute_gamma_structure_metrics(spot_price=spot_price, chain=chain)
     quality = compute_chain_quality_metrics(chain=chain)
     atm_iv = compute_atm_iv(spot_price=spot_price, chain=chain)
 
@@ -253,6 +387,7 @@ def compute_options_context_snapshot(
         **asdict(expected_move),
         **asdict(positioning),
         **asdict(skew),
+        **asdict(gamma),
     )
 
 

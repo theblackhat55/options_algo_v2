@@ -15,6 +15,9 @@ from options_algo_v2.services.options_context_store import (
     append_options_context_history,
     write_latest_options_context_snapshot,
 )
+from options_algo_v2.services.options_context_sqlite_store import (
+    upsert_options_context_snapshots,
+)
 
 
 def _parse_args(argv: list[str]) -> Path:
@@ -34,7 +37,10 @@ def _load_watchlist_rows(path: Path) -> list[dict[str, object]]:
     return [row for row in rows if isinstance(row, dict)]
 
 
-def build_options_context_snapshot(watchlist_path: str) -> str:
+def build_options_context_snapshot(
+    watchlist_path: str,
+    db_path: str = "data/cache/market_history_watchlist60.db",
+) -> str:
     base_path = Path(watchlist_path)
     base_rows = _load_watchlist_rows(base_path)
 
@@ -66,6 +72,10 @@ def build_options_context_snapshot(watchlist_path: str) -> str:
 
     latest_path = write_latest_options_context_snapshot(snapshots)
     history_path = append_options_context_history(snapshots)
+    sqlite_db_path = upsert_options_context_snapshots(
+        db_path=db_path,
+        snapshots=snapshots,
+    )
 
     print(f"watchlist_path={base_path}")
     print(f"options_chain_provider={provider_name}")
@@ -73,6 +83,7 @@ def build_options_context_snapshot(watchlist_path: str) -> str:
     print(f"row_count={len(snapshots)}")
     print(f"latest_snapshot_path={latest_path}")
     print(f"history_path={history_path}")
+    print(f"sqlite_db_path={sqlite_db_path}")
     print(f"low_confidence_symbols={low_confidence_symbols}")
 
     return str(latest_path)

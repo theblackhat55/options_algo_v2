@@ -5,8 +5,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-
-LATEST_OPTIONS_CONTEXT_PATH = Path("data/validation/latest_options_context.json")
+from options_algo_v2.services.options_context_loader import load_options_context_payload
 
 
 def _parse_args(argv: list[str]) -> tuple[Path, int | None]:
@@ -39,13 +38,8 @@ def _load_rows(path: Path) -> list[dict[str, object]]:
     return [row for row in rows if isinstance(row, dict)]
 
 
-def _load_latest_options_context(
-    path: Path = LATEST_OPTIONS_CONTEXT_PATH,
-) -> dict[str, dict[str, object]]:
-    if not path.exists():
-        return {}
-
-    payload = json.loads(path.read_text())
+def _load_latest_options_context() -> dict[str, dict[str, object]]:
+    payload = load_options_context_payload()
     rows = payload.get("rows", [])
     if not isinstance(rows, list):
         return {}
@@ -81,6 +75,12 @@ def _enrich_row_with_options_context(
         "confidence_reasons",
         "missing_fields",
         "source_provider",
+        "max_gamma_strike",
+        "gamma_flip_estimate",
+        "distance_to_gamma_flip_pct",
+        "gex_per_1pct_move",
+        "nearest_expiry_gamma_pct",
+        "options_summary_regime",
     ]
 
     for field_name in field_names:
@@ -104,6 +104,12 @@ def _enrich_row_with_options_context(
         enriched.setdefault("options_context_confidence", None)
         enriched.setdefault("confidence_reasons", [])
         enriched.setdefault("missing_fields", [])
+        enriched.setdefault("max_gamma_strike", None)
+        enriched.setdefault("gamma_flip_estimate", None)
+        enriched.setdefault("distance_to_gamma_flip_pct", None)
+        enriched.setdefault("gex_per_1pct_move", None)
+        enriched.setdefault("nearest_expiry_gamma_pct", None)
+        enriched.setdefault("options_summary_regime", None)
 
     return enriched
 

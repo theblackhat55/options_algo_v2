@@ -17,10 +17,6 @@ from options_algo_v2.services.iv_feature_estimator import (
 )
 from options_algo_v2.services.iv_rank_history import (
     IvProxyObservation,
-    append_iv_proxy_observation,
-    compute_iv_rank_from_history,
-    count_iv_proxy_observations,
-    default_iv_rank_history_path,
     list_iv_proxy_observation_counts,
 )
 from options_algo_v2.services.live_raw_feature_pipeline import (
@@ -139,6 +135,46 @@ def _load_iv_history_sqlite_first(db_path, history_path, symbol, as_of_date, tra
     if sqlite_rows:
         return sqlite_rows, "sqlite", len(sqlite_rows), 0
     return [], "none", 0, 0
+
+
+def _list_iv_proxy_observation_counts_from_sqlite(db_path, symbols=None):
+    import sqlite3
+    from pathlib import Path
+
+    if not db_path:
+        return {}
+    db_file = Path(db_path)
+    if not db_file.exists():
+        return {}
+
+    try:
+        conn = sqlite3.connect(str(db_file))
+        try:
+            if symbols:
+                placeholders = ",".join("?" for _ in symbols)
+                query = f'''
+                    SELECT symbol, COUNT(*)
+                    FROM iv_proxy_daily
+                    WHERE symbol IN ({placeholders})
+                    GROUP BY symbol
+                    ORDER BY symbol
+                '''
+                rows = conn.execute(query, tuple(symbols)).fetchall()
+            else:
+                rows = conn.execute(
+                    '''
+                    SELECT symbol, COUNT(*)
+                    FROM iv_proxy_daily
+                    GROUP BY symbol
+                    ORDER BY symbol
+                    '''
+                ).fetchall()
+        finally:
+            conn.close()
+    except Exception:
+        return {}
+
+    return {str(symbol): int(count) for symbol, count in rows}
 
 
 def _load_symbols_from_watchlist(path: Path) -> list[str]:
@@ -875,11 +911,11 @@ def run_nightly_scan(
             "iv_rank_insufficient_history_symbols": placeholder_iv_rank_symbols,
             "iv_rank_history_path": str(history_path),
             "iv_rank_trailing_observations": IV_RANK_TRAILING_OBSERVATIONS,
-            "iv_rank_observation_counts": list_iv_proxy_observation_counts(history_path),
-            "iv_rank_observation_count_by_symbol": {
-                symbol: count_iv_proxy_observations(path=history_path, symbol=symbol)
-                for symbol in selected_symbols
-            },
+            "iv_rank_observation_counts": _list_iv_proxy_observation_counts_from_sqlite(history_path, selected_symbols),
+            "iv_rank_observation_count_by_symbol": _list_iv_proxy_observation_counts_from_sqlite(
+                history_path,
+                selected_symbols,
+            ),
             "quote_quality_by_symbol": quote_quality_by_symbol,
             "aggregate_quote_quality_counts": aggregate_quote_quality_counts,
             "liquidity_debug_by_symbol": liquidity_debug_by_symbol,
@@ -967,10 +1003,14 @@ def run_nightly_scan(
     print(f"strategy_type_counts={summary['strategy_type_counts']}")
     print(f"historical_provider_modes={historical_provider_modes}")
     print(f"breadth_override_symbols={breadth_override_symbols}")
+    low_confidence_symbols = runtime_metadata.get(
+        "options_context_low_confidence_symbols", []
+    )
     print(
         "options_context_coverage="
         f"matched={runtime_metadata.get('options_context_matched_count')},"
-        f"missing={runtime_metadata.get('options_context_missing_count')}"
+        f"missing={runtime_metadata.get('options_context_missing_count')},"
+        f"low_confidence={len(low_confidence_symbols)}"
     )
     print(
         "options_context_regime_counts="
@@ -984,6 +1024,23 @@ def run_nightly_scan(
         "options_context_top_skew_symbols="
         f"{runtime_metadata.get('options_context_top_skew_symbols', [])}"
     )
+    print(
+        "options_context_top_gamma_flip_risk_symbols="
+        f"{runtime_metadata.get('options_context_top_gamma_flip_risk_symbols', [])}"
+    )
+    print(
+        "options_context_top_gex_symbols="
+        f"{runtime_metadata.get('options_context_top_gex_symbols', [])}"
+    )
+    print(
+        "options_context_top_front_gamma_symbols="
+        f"{runtime_metadata.get('options_context_top_front_gamma_symbols', [])}"
+    )
+    if low_confidence_symbols:
+        print(
+            "options_context_low_confidence_symbols="
+            f"{low_confidence_symbols[:10]}"
+        )
     print(
         "top_trade_candidate_symbols="
         f"{runtime_metadata.get('top_trade_candidate_symbols', [])}"
