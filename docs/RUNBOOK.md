@@ -17,7 +17,7 @@ For a shorter daily reference, see [`OPERATOR_QUICKSTART.md`](OPERATOR_QUICKSTAR
 4. **Options chain** — Polygon live snapshots (bid/ask/mid/delta/OI/volume/IV)
 5. **Volatility context**
    - `iv_hv_ratio` — near-ATM IV proxy ÷ HV20 (live)
-   - `iv_rank` — percentile rank over 60-observation rolling window (placeholder until history accumulates)
+   - `iv_rank` — percentile rank over rolling window; auto-accumulated each live scan run via `upsert_iv_proxy_rows`
 6. **Market regime classifier** — TREND_UP / TREND_DOWN / RANGE_UNCLEAR / RISK_OFF
 7. **Directional state classifier** — BULLISH_CONTINUATION / BULLISH_BREAKOUT / BEARISH_CONTINUATION / BEARISH_BREAKDOWN / NEUTRAL / NO_TRADE
 8. **IV state classifier** — IV_RICH (2-of-2 active signals: `iv_rank ≥ 60` + `iv_hv_ratio ≥ 1.25`) / IV_CHEAP / IV_NORMAL
@@ -29,10 +29,10 @@ For a shorter daily reference, see [`OPERATOR_QUICKSTART.md`](OPERATOR_QUICKSTAR
 14. **Trade idea generation + scan artifact**
 15. **Paper-live validation logging**
 
-## Analytical modules (implemented, not yet wired into main pipeline)
-- `services/support_resistance.py` — pivot-point S/R detection and strike validation
-- `services/expected_move.py` — implied vs. forecast expected move edge classification
-- `services/regime_transition.py` — regime transition detection, confidence, direction tracking
+## Analytical modules
+- `services/expected_move.py` — implied vs. forecast expected move edge classification (wired into `feature_normalizer.py`)
+- `services/regime_transition.py` — regime transition detection, confidence, direction tracking (wired into `run_nightly_scan.py`)
+- `services/support_resistance.py` — pivot-point S/R detection and strike validation (wired into trade candidate selector; not yet in main scan loop)
 
 ---
 
@@ -53,11 +53,7 @@ For a shorter daily reference, see [`OPERATOR_QUICKSTART.md`](OPERATOR_QUICKSTAR
 ## Known gaps (code-confirmed)
 | Gap | Location | Impact |
 |---|---|---|
-| `iv_rank` not auto-accumulating | `run_nightly_scan.py` imports but never calls `append_iv_proxy_observation` | IV rank stays placeholder until 60 obs/symbol exist |
-| Bear spread construction missing | `expiration_aware_spread_selector.py` only handles `BULL_PUT_SPREAD` and `BULL_CALL_SPREAD` | Bear-regime signals produce zero trade candidates |
-| `iv_rv_spread` always None | `feature_normalizer.py` passes `iv_rv_spread=None` to `classify_iv_state` | Third IV-rich signal inactive; IV_RICH requires both rank ≥ 60 AND iv_hv ≥ 1.25 |
-| Continuous scoring not used | `decision_engine.py` calls `score_candidate` with booleans only (no `adx`, `iv_ratio`, `breadth_distance`) | All qualified candidates score 100.0 before context adjustment |
-| `vix_defensive` hardwired False | `feature_normalizer.py` | RISK_OFF regime unreachable |
+| `support_resistance.py` not in main scan loop | wired into trade candidate selector only | Strike-level S/R validation not applied at scan time |
 
 ## Strict-live note
 Strict-live (`OPTIONS_ALGO_STRICT_LIVE_MODE=1`) is intentionally blocked whenever placeholder IV rank inputs remain. This is a safety gate.
@@ -113,7 +109,7 @@ Strict-live (`OPTIONS_ALGO_STRICT_LIVE_MODE=1`) is intentionally blocked wheneve
 - `data/scan_results/` — `scan_<run_id>.json` artifacts
 - `data/watchlists/` — watchlist JSON files
 - `data/validation/` — paper-live JSONL/CSV logs
-- `data/state/` — `iv_proxy_history.jsonl`
+- `data/cache/` — `market_history_watchlist60.db` (SQLite — IV proxy history, options context)
 
 ---
 
@@ -347,31 +343,21 @@ Helps answer: which symbols repeatedly pass, which are persistently neutral, ADX
 # 11. IV Rank History
 
 ## Current state
-`iv_rank` uses a 60-observation rolling percentile rank. Until 60 observations exist per symbol, the fallback is 50.0 (neutral). IV state therefore defaults to IV_NORMAL or IV_CHEAP for most symbols until history accumulates.
-
-**Important**: The live scan currently does not auto-write observations. `append_iv_proxy_observation` exists in `services/iv_rank_history.py` but is not called from `run_nightly_scan.py`. IV proxy history must be written by a separate process until this is wired in.
+`iv_rank` uses a rolling percentile rank. `upsert_iv_proxy_rows` is called automatically on every live scan run via `history_store`, writing to SQLite. IV rank becomes active once 20 observations per symbol exist; until then the fallback is 50.0.
 
 ## Storage location
 ```
-data/state/iv_proxy_history.jsonl
+data/cache/market_history_watchlist60.db   (table: iv_proxy_daily)
 ```
-
-Each line: `{"as_of_date": "2026-03-22", "symbol": "AAPL", "implied_vol_proxy": 0.28, "source": "polygon_near_atm"}`
 
 ## Inspect counts
 ```bash
 python - <<'PY'
-import json
-from collections import Counter
-from pathlib import Path
-path = Path("data/state/iv_proxy_history.jsonl")
-if not path.exists():
-    print("no history file")
-else:
-    rows = [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
-    counts = Counter(r["symbol"] for r in rows)
-    for sym, count in sorted(counts.items()):
-        print(f"{sym}: {count} observations (need 60)")
+import sqlite3
+conn = sqlite3.connect("data/cache/market_history_watchlist60.db")
+rows = conn.execute("SELECT symbol, COUNT(*) FROM iv_proxy_daily GROUP BY symbol ORDER BY symbol").fetchall()
+for sym, count in rows:
+    print(f"{sym}: {count} observations")
 PY
 ```
 
@@ -473,14 +459,10 @@ Common causes: missing `DATABENTO_API_KEY`, missing `POLYGON_API_KEY`, live mark
 The options context is loaded from `data/validation/latest_options_context.json` if it exists. In most paper-live runs this file will not be present (it is produced by the options context pipeline, not by `run_paper_live_daily.py` directly). Missing context applies a score penalty but does not hard-reject in mock mode.
 
 ## `iv_rank` stays placeholder
-Expected until 60 daily observations exist per symbol. Monitor with:
-```bash
-tail -n 20 data/state/iv_proxy_history.jsonl
-```
-or use the count script in section 11.
+Expected until 20 daily observations exist per symbol. Monitor with the SQLite count query in section 11. `upsert_iv_proxy_rows` runs automatically on every live scan so history accumulates without manual steps.
 
 ## Bear-regime candidates produce no trade ideas
-Known gap. `expiration_aware_spread_selector.py` returns `[]` for BEAR_CALL_SPREAD and BEAR_PUT_SPREAD. The signal will qualify and score correctly; it simply has no spread candidates built. Fix is pending.
+Check that the TREND_DOWN or RANGE_UNCLEAR regime is active and that the directional classifier is returning a bearish state. Bear spread construction is implemented in `expiration_aware_spread_selector.py`.
 
 ## `clean_test: command not found`
 Use the raw commands:
@@ -525,27 +507,21 @@ Commit discipline: separate commits for feature pipeline changes, config changes
 - review logs and leaderboard
 - watchlist experimentation
 - strategy observation
-- IV history accumulation (manual or via a separate write process)
+- IV history accumulation (automatic on every live scan run)
 
 ## Not yet safe
-- unattended strict-live execution
-- bear-regime signal-to-trade pipeline (spread construction missing)
+- unattended strict-live execution (IV rank still building up history across full watchlist)
 - small-capital live deployment
 
 ---
 
 # 18. Recommended Near-Term Priorities
 
-1. **Wire `append_iv_proxy_observation`** into `run_nightly_scan.py` so IV proxy history accumulates automatically every live run
-2. **Add bear spread construction** to `expiration_aware_spread_selector.py`
-3. **Populate `iv_rv_spread`** from IV proxy minus HV20 so the third IV signal activates
-4. **Pass continuous ADX/IV/breadth to `score_candidate`** in `decision_engine.py` for finer candidate differentiation
-5. **Wire `expected_move.py`** into trade candidate filtering
-6. **Wire `support_resistance.py`** into strike selection validation
-7. **Wire `regime_transition.py`** into entry scoring or timing
-8. **Continue daily paper-live validation** and accumulate IV history
-9. **Complete production hardening** (breadth freshness, quote-quality thresholds, risk caps, monitoring)
-10. **Enable strict-live** only after placeholder IV rank is eliminated
+1. **Wire `support_resistance.py` into `run_nightly_scan.py`** for strike-level S/R validation at scan time
+2. **Complete production hardening** — breadth freshness checks, quote-quality thresholds, risk caps, monitoring
+3. **Enable strict-live** once IV rank history reaches threshold across the full watchlist
+4. **Expand paper-live validation** — accumulate multi-week pass rate, tune scoring thresholds from real signal data
+5. **Add paper execution simulation** — fill/slippage model, daily P&L tracking against trade ideas
 
 ---
 
@@ -570,8 +546,8 @@ PYTHONPATH=src python scripts/review_paper_live_logs.py --last-runs 5
 # Symbol leaderboard
 PYTHONPATH=src python scripts/paper_live_symbol_leaderboard.py --last-runs 5
 
-# IV history tail
-tail -n 20 data/state/iv_proxy_history.jsonl
+# IV history counts (SQLite)
+sqlite3 data/cache/market_history_watchlist60.db "SELECT symbol, COUNT(*) FROM iv_proxy_daily GROUP BY symbol ORDER BY symbol"
 
 # Validate code
 pytest && ruff check . && mypy src
