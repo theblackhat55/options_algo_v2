@@ -47,14 +47,24 @@ def test_trend_down_allows_only_bearish_structures() -> None:
     ) is False
 
 
-def test_range_unclear_allows_no_new_entries() -> None:
+def test_range_unclear_allows_defined_risk_spreads() -> None:
+    # RANGE_UNCLEAR permits defined-risk credit/debit spreads
     assert regime_allows_strategy(
         MarketRegime.RANGE_UNCLEAR,
         StrategyType.BULL_PUT_SPREAD,
-    ) is False
+    ) is True
     assert regime_allows_strategy(
         MarketRegime.RANGE_UNCLEAR,
         StrategyType.BEAR_CALL_SPREAD,
+    ) is True
+    assert regime_allows_strategy(
+        MarketRegime.RANGE_UNCLEAR,
+        StrategyType.BEAR_PUT_SPREAD,
+    ) is True
+    # Pure long-bias debit spreads are not allowed in RANGE_UNCLEAR
+    assert regime_allows_strategy(
+        MarketRegime.RANGE_UNCLEAR,
+        StrategyType.BULL_CALL_SPREAD,
     ) is False
 
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 
 def build_mock_historical_rows(symbol: str) -> list[dict[str, object]]:
     pass_symbols = {"AAPL", "MSFT", "NVDA"}
@@ -18,8 +20,8 @@ def build_mock_historical_rows(symbol: str) -> list[dict[str, object]]:
             {
                 "ts_event": f"2026-03-{index:02d}T21:00:00Z",
                 "open": close - 1.0,
-                "high": close + 1.0,
-                "low": close - 3.0,
+                "high": close + 1.5,
+                "low": close - 2.0,
                 "close": close,
                 "volume": 1_000_000 + index * 1_000,
             }
@@ -28,17 +30,21 @@ def build_mock_historical_rows(symbol: str) -> list[dict[str, object]]:
 
 
 def _build_pass_series() -> list[float]:
-    first_segment = [100.0 + day for day in range(30)]
-    second_segment = [130.0 + 0.25 * day for day in range(19)]
-    final_close = 135.0
-    return first_segment + second_segment + [final_close]
+    """Slow uptrend with oscillations.
+
+    Produces: close > dma20 > dma50, ADX >= 18, RSI in [45, 85],
+    not extended — qualifies as BULLISH_CONTINUATION.
+    """
+    return [
+        round(100.0 + i * 0.3 + 2.0 * math.sin(i * 0.9), 2)
+        for i in range(50)
+    ]
 
 
 def _build_extended_series() -> list[float]:
-    first_segment = [100.0 + day for day in range(30)]
-    second_segment = [130.0 + 0.5 * day for day in range(19)]
-    final_close = 142.0
-    return first_segment + second_segment + [final_close]
+    """Uptrend with a sharp final spike so close - dma20 > 2 * atr20."""
+    base = [round(100.0 + i * 0.5, 2) for i in range(49)]
+    return base + [base[-1] + 12.0]
 
 
 def _build_neutral_series() -> list[float]:

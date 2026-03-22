@@ -4,6 +4,7 @@ from dataclasses import replace
 from typing import Any
 
 from options_algo_v2.domain.decision import CandidateDecision
+from options_algo_v2.services.runtime_mode import is_mock_mode
 
 
 def _to_float(value: object) -> float | None:
@@ -29,7 +30,11 @@ def _build_adjustment(context_row: dict[str, Any] | None) -> tuple[
     list[str],
 ]:
     if not isinstance(context_row, dict) or not context_row.get("context_available"):
-        return -8.0, ["options_context_missing"], True, ["options_context_missing"]
+        # In mock mode treat missing context as a score penalty only — never hard reject.
+        # In live mode apply the full -8.0 penalty but still no hard reject for missing
+        # context alone; hard_reject is reserved for low-confidence + bad-regime combos.
+        score_delta = -8.0 if not is_mock_mode() else -4.0
+        return score_delta, ["options_context_missing"], False, ["options_context_missing"]
 
     confidence = _to_float(context_row.get("confidence_score")) or 0.0
     regime = str(context_row.get("options_summary_regime") or "").strip().lower()

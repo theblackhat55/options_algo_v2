@@ -34,8 +34,8 @@ def build_sample_decisions():
         ),
         CandidateEvaluationInput(
             symbol="SPY",
-            market_regime=MarketRegime.RANGE_UNCLEAR,
-            directional_state=DirectionalState.BULLISH_CONTINUATION,
+            market_regime=MarketRegime.TREND_UP,
+            directional_state=DirectionalState.NEUTRAL,
             iv_state=IVState.IV_RICH,
             earnings_date=None,
             planned_latest_exit=date(2026, 3, 20),
