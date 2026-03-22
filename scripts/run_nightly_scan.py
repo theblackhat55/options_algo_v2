@@ -23,6 +23,7 @@ from options_algo_v2.services.live_raw_feature_pipeline import (
     build_live_raw_feature_input,
     build_live_raw_feature_input_from_rows,
 )
+from options_algo_v2.services.history_store import upsert_iv_proxy_rows
 from options_algo_v2.services.market_breadth_provider_factory import (
     build_market_breadth_provider,
 )
@@ -410,6 +411,22 @@ def _compute_live_iv_metrics(
         snapshot=snapshot,
         underlying_price=latest_close,
     )
+
+    if implied_vol_proxy is not None and implied_vol_proxy > 0:
+        market_history_db_path = Path(
+            os.getenv("MARKET_HISTORY_DB_PATH", "data/cache/market_history_watchlist60.db")
+        )
+        upsert_iv_proxy_rows(
+            rows=[
+                {
+                    "symbol": symbol,
+                    "as_of_date": as_of_date.isoformat(),
+                    "implied_vol_proxy": float(implied_vol_proxy),
+                    "source": getattr(snapshot, "source", "polygon_near_atm") or "polygon_near_atm",
+                }
+            ],
+            db_path=market_history_db_path,
+        )
 
     iv_hv_ratio = compute_iv_hv_ratio_from_snapshot_and_bars(
         snapshot=snapshot,
