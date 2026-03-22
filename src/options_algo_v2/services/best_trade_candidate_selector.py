@@ -17,6 +17,32 @@ def _to_float(value: object) -> float:
     return 0.0
 
 
+def _support_resistance_adjustment(item: dict[str, object]) -> float:
+    strategy_family = str(item.get("strategy_family", ""))
+    if strategy_family not in {"BULL_PUT_SPREAD", "BEAR_CALL_SPREAD"}:
+        return 0.0
+
+    valid_raw = item.get("support_resistance_valid")
+    distance = _to_float(item.get("support_resistance_distance_pct", 0.0))
+
+    if not isinstance(valid_raw, bool):
+        return 0.0
+
+    score = 0.0
+    if valid_raw:
+        score += 0.08
+        if distance <= 0.5:
+            score += 0.04
+        elif distance <= 1.0:
+            score += 0.02
+    else:
+        score -= 0.10
+        if distance > 2.0:
+            score -= 0.02
+
+    return score
+
+
 def _candidate_score(item: dict[str, object]) -> float:
     width = _to_float(item.get("width", 0.0))
     net_credit = _to_float(item.get("net_credit", 0.0))
@@ -27,7 +53,7 @@ def _candidate_score(item: dict[str, object]) -> float:
         return 0.0
 
     if strategy_family in {"BULL_PUT_SPREAD", "BEAR_CALL_SPREAD"}:
-        return min(1.0, net_credit / width)
+        return min(1.0, net_credit / width) + _support_resistance_adjustment(item)
 
     if strategy_family in {"BULL_CALL_SPREAD", "BEAR_PUT_SPREAD"}:
         return max(0.0, 1.0 - (net_debit / width))
