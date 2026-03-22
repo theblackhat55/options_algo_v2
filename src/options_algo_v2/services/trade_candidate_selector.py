@@ -42,7 +42,7 @@ def select_and_rank_trade_candidates(
     ranked: list[RankedTradeCandidate] = []
 
     for candidate in candidates:
-        if candidate.strategy_family == "BULL_PUT_SPREAD":
+        if candidate.strategy_family in {"BULL_PUT_SPREAD", "BEAR_CALL_SPREAD"}:
             if not passes_bull_put_delta_filter(candidate):
                 continue
             if not passes_credit_width_filter(candidate):
@@ -57,7 +57,7 @@ def select_and_rank_trade_candidates(
                 net_credit=candidate.net_credit,
                 width=candidate.width,
             )
-        elif candidate.strategy_family == "BULL_CALL_SPREAD":
+        elif candidate.strategy_family in {"BULL_CALL_SPREAD", "BEAR_PUT_SPREAD"}:
             if not passes_bull_call_delta_filter(candidate):
                 continue
             if not passes_debit_width_filter(candidate):
