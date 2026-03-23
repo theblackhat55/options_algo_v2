@@ -28,6 +28,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default="data/validation",
         help="Directory for paper-live JSONL/CSV outputs",
     )
+    parser.add_argument(
+        "--end-date",
+        type=str,
+        default=None,
+        help="Optional end date in YYYY-MM-DD format",
+    )
     return parser
 
 
@@ -35,7 +41,10 @@ def main() -> int:
     parser = _build_parser()
     args = parser.parse_args()
 
-    artifact_path = run_nightly_scan(watchlist_path=args.watchlist)
+    artifact_path = run_nightly_scan(
+        watchlist_path=args.watchlist,
+        end_date=args.end_date,
+    )
     payload = json.loads(Path(artifact_path).read_text())
 
     paths = default_paper_live_log_paths(args.validation_dir)

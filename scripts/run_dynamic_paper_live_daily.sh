@@ -90,7 +90,7 @@ LATEST_FILTERED_WATCHLIST="$(ls -1t data/watchlists/options_watchlist_filtered_*
 echo "latest_filtered_watchlist=${LATEST_FILTERED_WATCHLIST}"
 
 echo "==> Step 4: run paper-live daily"
-python scripts/run_paper_live_daily.py --watchlist "${LATEST_FILTERED_WATCHLIST}"
+python scripts/run_paper_live_daily.py --watchlist "${LATEST_FILTERED_WATCHLIST}" ${END_DATE:+--end-date "$END_DATE"}
 
 echo "==> Step 5: build OpenClaw report"
 python scripts/build_openclaw_options_report.py

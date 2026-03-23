@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import os
 from datetime import date
@@ -230,6 +231,7 @@ def _get_bar_rows(
     symbol: str,
     dataset: str,
     schema: str,
+    end_date: str | None = None,
 ) -> list[dict[str, object]]:
     get_rows = getattr(row_provider, "get_bar_rows", None)
     if get_rows is None:
@@ -238,6 +240,7 @@ def _get_bar_rows(
         symbol=symbol,
         dataset=dataset,
         schema=schema,
+        end_date=end_date,
     )
     if not isinstance(rows, list):
         return []
@@ -587,6 +590,7 @@ def _build_raw_feature_with_fallback(
     breadth_provider: object,
     options_chain_provider: object,
     as_of_date: date,
+    end_date: str | None = None,
 ) -> tuple[
     object,
     str,
@@ -674,6 +678,7 @@ def _build_raw_feature_with_fallback(
                 symbol=symbol,
                 dataset=dataset,
                 schema=schema,
+                end_date=end_date,
             )
             return (
                 raw,
@@ -691,6 +696,7 @@ def _build_raw_feature_with_fallback(
         symbol=symbol,
         dataset=dataset,
         schema=schema,
+        end_date=end_date,
     )
 
     snapshot = _get_options_snapshot(
@@ -808,6 +814,7 @@ def _infer_recent_regime_history(decisions: list[object]) -> list[MarketRegime]:
 def run_nightly_scan(
     symbols: list[str] | None = None,
     watchlist_path: str | None = None,
+    end_date: str | None = None,
 ) -> str:
     runtime_mode = get_runtime_mode()
     execution_settings = get_runtime_execution_settings()
@@ -883,6 +890,7 @@ def run_nightly_scan(
             breadth_provider=breadth_provider,
             options_chain_provider=options_chain_provider,
             as_of_date=execution_settings.as_of_date,
+            end_date=end_date,
         )
         historical_provider_modes[symbol] = provider_mode
 
@@ -1139,4 +1147,21 @@ def run_nightly_scan(
 
 
 if __name__ == "__main__":
-    run_nightly_scan()
+    parser = argparse.ArgumentParser(description="Run nightly scan.")
+    parser.add_argument(
+        "--watchlist",
+        type=str,
+        default=None,
+        help="Optional watchlist JSON path",
+    )
+    parser.add_argument(
+        "--end-date",
+        type=str,
+        default=None,
+        help="Optional end date in YYYY-MM-DD format",
+    )
+    args = parser.parse_args()
+    run_nightly_scan(
+        watchlist_path=args.watchlist,
+        end_date=args.end_date,
+    )
