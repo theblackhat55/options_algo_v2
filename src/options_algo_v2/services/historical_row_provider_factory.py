@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from options_algo_v2.adapters.databento_live_historical_row_client import (
@@ -59,6 +60,78 @@ def _get_sqlite_min_rows() -> int:
     except ValueError:
         return DEFAULT_SQLITE_MIN_ROWS
     return max(1, value)
+
+
+def _get_bool_env(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    value = raw.strip().lower()
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    if value in {"0", "false", "no", "off"}:
+        return False
+    return default
+
+
+def _get_max_historical_staleness_days() -> int:
+    raw = os.getenv("OPTIONS_ALGO_MAX_HISTORICAL_STALENESS_DAYS", "0").strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        return 0
+    return max(0, value)
+
+
+def _allow_stale_historical_rows() -> bool:
+    return _get_bool_env("OPTIONS_ALGO_ALLOW_STALE_HISTORICAL_ROWS", True)
+
+
+def _resolve_business_end_date(end_date: str | None) -> str | None:
+    if not end_date:
+        return None
+    current = datetime.strptime(end_date, "%Y-%m-%d").date()
+    while current.weekday() >= 5:
+        current -= timedelta(days=1)
+    return current.isoformat()
+
+
+def _latest_bar_date(bars: list[BarData]) -> str | None:
+    if not bars:
+        return None
+    return str(bars[-1].timestamp)[:10]
+
+
+def _latest_row_date(rows: list[dict[str, object]]) -> str | None:
+    if not rows:
+        return None
+    latest = rows[-1]
+    ts_event = latest.get("ts_event") or latest.get("timestamp")
+    if ts_event is None:
+        return None
+    return str(ts_event)[:10]
+
+
+def _is_fresh_enough(
+    *,
+    latest_date: str | None,
+    resolved_end_date: str | None,
+    max_staleness_days: int,
+) -> bool:
+    if latest_date is None:
+        return False
+    if resolved_end_date is None:
+        return True
+
+    try:
+        latest_dt = datetime.strptime(latest_date, "%Y-%m-%d").date()
+        resolved_dt = datetime.strptime(resolved_end_date, "%Y-%m-%d").date()
+    except ValueError:
+        return False
+
+    lag_days = (resolved_dt - latest_dt).days
+    return lag_days <= max_staleness_days
+
 
 
 def _rows_from_bars(bars: list[BarData]) -> list[dict[str, object]]:
@@ -157,12 +230,24 @@ class SQLiteFirstHistoricalRowProvider(HistoricalRowProvider):
 
         init_history_store(self.db_path)
 
+        resolved_end_date = _resolve_business_end_date(end_date)
+        max_staleness_days = _get_max_historical_staleness_days()
+        allow_stale_rows = _allow_stale_historical_rows()
+
         cached_bars = load_underlying_bars(
             symbol=symbol,
             end_date=end_date,
             db_path=self.db_path,
         )
-        if len(cached_bars) >= self.sqlite_min_rows:
+        cached_latest_date = _latest_bar_date(cached_bars)
+        cached_is_sufficient = len(cached_bars) >= self.sqlite_min_rows
+        cached_is_fresh = _is_fresh_enough(
+            latest_date=cached_latest_date,
+            resolved_end_date=resolved_end_date,
+            max_staleness_days=max_staleness_days,
+        )
+
+        if cached_is_sufficient and cached_is_fresh:
             return _rows_from_bars(cached_bars[-_get_lookback_days():])
 
         live_rows = self.primary.get_bar_rows(
@@ -171,25 +256,48 @@ class SQLiteFirstHistoricalRowProvider(HistoricalRowProvider):
             schema=schema,
             end_date=end_date,
         )
-        if not live_rows:
-            return _rows_from_bars(cached_bars[-_get_lookback_days():])
 
-        fetched_bars = _bars_from_rows(live_rows)
-        if fetched_bars:
-            upsert_underlying_bars(
-                symbol=symbol,
-                bars=fetched_bars,
-                db_path=self.db_path,
-                source=self.primary.source,
-            )
+        fetched_latest_date = _latest_row_date(live_rows)
+        fetched_is_fresh = _is_fresh_enough(
+            latest_date=fetched_latest_date,
+            resolved_end_date=resolved_end_date,
+            max_staleness_days=max_staleness_days,
+        )
+
+        if live_rows:
+            fetched_bars = _bars_from_rows(live_rows)
+            if fetched_bars:
+                upsert_underlying_bars(
+                    symbol=symbol,
+                    bars=fetched_bars,
+                    db_path=self.db_path,
+                    source=self.primary.source,
+                )
 
         refreshed_bars = load_underlying_bars(
             symbol=symbol,
             end_date=end_date,
             db_path=self.db_path,
         )
-        if refreshed_bars:
+        refreshed_latest_date = _latest_bar_date(refreshed_bars)
+        refreshed_is_sufficient = len(refreshed_bars) >= self.sqlite_min_rows
+        refreshed_is_fresh = _is_fresh_enough(
+            latest_date=refreshed_latest_date,
+            resolved_end_date=resolved_end_date,
+            max_staleness_days=max_staleness_days,
+        )
+
+        if refreshed_bars and refreshed_is_sufficient and refreshed_is_fresh:
             return _rows_from_bars(refreshed_bars[-_get_lookback_days():])
+
+        if live_rows and fetched_is_fresh:
+            return live_rows
+
+        if allow_stale_rows:
+            if refreshed_bars:
+                return _rows_from_bars(refreshed_bars[-_get_lookback_days():])
+            if cached_bars:
+                return _rows_from_bars(cached_bars[-_get_lookback_days():])
 
         return live_rows
 
