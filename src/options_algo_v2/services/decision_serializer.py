@@ -3,28 +3,121 @@ from __future__ import annotations
 from options_algo_v2.domain.decision import CandidateDecision
 
 
-def _directional_checks(decision: CandidateDecision) -> dict[str, bool]:
+def _directional_diagnostics(decision: CandidateDecision) -> dict[str, object]:
     close_gt_dma20 = False
-    if decision.close is not None and decision.dma20 is not None:
-        close_value = decision.close
-        dma20_value = decision.dma20
-        close_gt_dma20 = close_value > dma20_value
-
+    close_gt_dma50 = False
+    close_lt_dma20 = False
+    close_lt_dma50 = False
     dma20_gt_dma50 = False
-    if decision.dma20 is not None and decision.dma50 is not None:
-        dma20_value = decision.dma20
-        dma50_value = decision.dma50
-        dma20_gt_dma50 = dma20_value > dma50_value
-
+    dma20_lt_dma50 = False
     adx14_gte_18 = False
+    adx14_gte_16 = False
+    rsi_in_bullish_range = False
+    rsi_in_bearish_range = False
+    breakout_volume_multiple_gte_1_5 = False
+
+    if decision.close is not None and decision.dma20 is not None:
+        close_gt_dma20 = decision.close > decision.dma20
+        close_lt_dma20 = decision.close < decision.dma20
+
+    if decision.close is not None and decision.dma50 is not None:
+        close_gt_dma50 = decision.close > decision.dma50
+        close_lt_dma50 = decision.close < decision.dma50
+
+    if decision.dma20 is not None and decision.dma50 is not None:
+        dma20_gt_dma50 = decision.dma20 > decision.dma50
+        dma20_lt_dma50 = decision.dma20 < decision.dma50
+
     if decision.adx14 is not None:
-        adx14_value = decision.adx14
-        adx14_gte_18 = adx14_value >= 18.0
+        adx14_gte_18 = decision.adx14 >= 18.0
+        adx14_gte_16 = decision.adx14 >= 16.0
+
+    if decision.rsi14 is not None:
+        rsi_in_bullish_range = 45.0 <= decision.rsi14 <= 85.0
+        rsi_in_bearish_range = 10.0 <= decision.rsi14 <= 55.0
+
+    if decision.breakout_volume_multiple is not None:
+        breakout_volume_multiple_gte_1_5 = decision.breakout_volume_multiple >= 1.5
+
+    bullish_setup_ready = (
+        close_gt_dma20
+        and adx14_gte_16
+        and rsi_in_bullish_range
+        and not bool(decision.extended_up)
+    )
+
+    bearish_setup_ready = (
+        close_lt_dma20
+        and adx14_gte_16
+        and rsi_in_bearish_range
+        and not bool(decision.extended_down)
+    )
+
+    actionable_directional_state = decision.candidate.directional_state.value not in {
+        "NEUTRAL",
+        "NO_TRADE",
+    }
+
+    blockers: list[str] = []
+
+    if not close_gt_dma20 and not close_lt_dma20:
+        blockers.append("close_not_separated_from_dma20")
+    if not close_gt_dma50 and not close_lt_dma50:
+        blockers.append("close_not_separated_from_dma50")
+    if not adx14_gte_16:
+        blockers.append("adx_below_trending_min")
+    if decision.rsi14 is None:
+        blockers.append("rsi_missing")
+    elif not rsi_in_bullish_range and not rsi_in_bearish_range:
+        blockers.append("rsi_outside_bull_bear_ranges")
+    if bool(decision.extended_up):
+        blockers.append("extended_up")
+    if bool(decision.extended_down):
+        blockers.append("extended_down")
+
+    if not bullish_setup_ready:
+        if not close_gt_dma20:
+            blockers.append("bullish_not_above_20dma")
+        if not rsi_in_bullish_range and decision.rsi14 is not None:
+            blockers.append("bullish_rsi_not_in_range")
+
+    if not bearish_setup_ready:
+        if not close_lt_dma20:
+            blockers.append("bearish_not_below_20dma")
+        if not rsi_in_bearish_range and decision.rsi14 is not None:
+            blockers.append("bearish_rsi_not_in_range")
+
+    if (
+        decision.candidate.directional_state.value == "BULLISH_BREAKOUT"
+        and not bool(decision.breakout_above_20d_high)
+    ):
+        blockers.append("breakout_flag_missing")
+    if (
+        decision.candidate.directional_state.value == "BEARISH_BREAKDOWN"
+        and not bool(decision.breakdown_below_20d_low)
+    ):
+        blockers.append("breakdown_flag_missing")
 
     return {
         "close_gt_dma20": close_gt_dma20,
+        "close_gt_dma50": close_gt_dma50,
+        "close_lt_dma20": close_lt_dma20,
+        "close_lt_dma50": close_lt_dma50,
         "dma20_gt_dma50": dma20_gt_dma50,
+        "dma20_lt_dma50": dma20_lt_dma50,
         "adx14_gte_18": adx14_gte_18,
+        "adx14_gte_16": adx14_gte_16,
+        "rsi_in_bullish_range": rsi_in_bullish_range,
+        "rsi_in_bearish_range": rsi_in_bearish_range,
+        "breakout_above_20d_high": bool(decision.breakout_above_20d_high),
+        "breakdown_below_20d_low": bool(decision.breakdown_below_20d_low),
+        "breakout_volume_multiple_gte_1_5": breakout_volume_multiple_gte_1_5,
+        "extended_up": bool(decision.extended_up),
+        "extended_down": bool(decision.extended_down),
+        "bullish_setup_ready": bullish_setup_ready,
+        "bearish_setup_ready": bearish_setup_ready,
+        "actionable_directional_state": actionable_directional_state,
+        "directional_blockers": blockers,
     }
 
 
@@ -70,5 +163,5 @@ def serialize_candidate_decision(
         "breakout_volume_multiple": decision.breakout_volume_multiple,
         "extended_up": decision.extended_up,
         "extended_down": decision.extended_down,
-        "directional_checks": _directional_checks(decision),
+        "directional_diagnostics": _directional_diagnostics(decision),
     }
