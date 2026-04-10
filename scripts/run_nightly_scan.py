@@ -974,6 +974,7 @@ def run_nightly_scan(
         decisions=decisions,
         degraded_metadata={
             "as_of_date": execution_settings.as_of_date.isoformat(),
+            "end_date": end_date,
             "strict_live_mode": execution_settings.strict_live_mode,
             "used_mock_historical_fallback": used_mock_historical_fallback,
             "historical_provider_modes": historical_provider_modes,
