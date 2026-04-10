@@ -248,18 +248,25 @@ def apply_options_context_to_decisions(
         if new_final_score < 0.0:
             new_final_score = 0.0
 
-        rejection_reasons = list(decision.rejection_reasons)
+        rejection_reasons = [
+            reason
+            for reason in list(decision.rejection_reasons)
+            if reason != "candidate score below minimum threshold"
+        ]
         for reason in extra_reasons:
             if reason not in rejection_reasons:
                 rejection_reasons.append(reason)
 
-        final_passed = bool(decision.final_passed)
+        has_non_score_rejections = len(rejection_reasons) > 0
+
         if hard_reject:
             final_passed = False
-        elif final_passed and new_final_score < float(decision.min_score_required):
-            final_passed = False
-            if "candidate score below minimum threshold" not in rejection_reasons:
-                rejection_reasons.append("candidate score below minimum threshold")
+        else:
+            score_meets_threshold = new_final_score >= float(decision.min_score_required)
+            if not score_meets_threshold:
+                if "candidate score below minimum threshold" not in rejection_reasons:
+                    rejection_reasons.append("candidate score below minimum threshold")
+            final_passed = score_meets_threshold and not has_non_score_rejections
 
         adjusted_decision = replace(
             decision,
