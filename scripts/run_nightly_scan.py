@@ -583,6 +583,35 @@ def _build_liquidity_debug_info(
     }
 
 
+def _build_historical_provider_diagnostic(
+    *,
+    symbol: str,
+    provider_mode: str,
+    bar_rows: list[dict[str, object]],
+    end_date: str | None,
+) -> dict[str, object]:
+    latest_row_date = None
+    if bar_rows:
+        latest = bar_rows[-1]
+        ts_event = latest.get("ts_event") if isinstance(latest, dict) else None
+        if ts_event is None and isinstance(latest, dict):
+            ts_event = latest.get("timestamp")
+        if ts_event is not None:
+            latest_row_date = str(ts_event)[:10]
+
+    return {
+        "symbol": symbol,
+        "provider_mode": provider_mode,
+        "returned_row_count": len(bar_rows),
+        "requested_end_date": end_date,
+        "has_rows": bool(bar_rows),
+        "latest_row_date": latest_row_date,
+        "historical_row_provider": get_historical_row_provider_name(),
+        "historical_row_provider_source": get_historical_row_provider_source(),
+    }
+
+
+
 def _build_raw_feature_with_fallback(
     *,
     symbol: str,
@@ -856,6 +885,7 @@ def run_nightly_scan(
 
     raw_features = []
     historical_provider_modes: dict[str, str] = {}
+    historical_provider_diagnostics_by_symbol: dict[str, dict[str, object]] = {}
     breadth_override_symbols: list[str] = []
     placeholder_iv_rank_symbols: list[str] = []
     placeholder_iv_hv_ratio_symbols: list[str] = []
@@ -893,6 +923,12 @@ def run_nightly_scan(
             end_date=end_date,
         )
         historical_provider_modes[symbol] = provider_mode
+        historical_provider_diagnostics_by_symbol[symbol] = _build_historical_provider_diagnostic(
+            symbol=symbol,
+            provider_mode=provider_mode,
+            bar_rows=bar_rows,
+            end_date=end_date,
+        )
 
         symbol_quote_quality_counts = _build_quote_quality_counts(snapshot)
         quote_quality_by_symbol[symbol] = symbol_quote_quality_counts
@@ -978,6 +1014,27 @@ def run_nightly_scan(
             "strict_live_mode": execution_settings.strict_live_mode,
             "used_mock_historical_fallback": used_mock_historical_fallback,
             "historical_provider_modes": historical_provider_modes,
+            "historical_provider_diagnostics_by_symbol": historical_provider_diagnostics_by_symbol,
+            "historical_provider_mode_counts": {
+                mode: sum(1 for value in historical_provider_modes.values() if value == mode)
+                for mode in sorted(set(historical_provider_modes.values()))
+            },
+            "historical_symbols_with_no_rows": sorted(
+                [
+                    symbol
+                    for symbol, payload in historical_provider_diagnostics_by_symbol.items()
+                    if not payload.get("has_rows")
+                ]
+            ),
+            "historical_symbols_with_stale_latest_row": sorted(
+                [
+                    symbol
+                    for symbol, payload in historical_provider_diagnostics_by_symbol.items()
+                    if payload.get("latest_row_date") is not None
+                    and end_date is not None
+                    and str(payload.get("latest_row_date")) < str(end_date)
+                ]
+            ),
             "used_breadth_override": bool(breadth_override_symbols),
             "breadth_override_symbols": breadth_override_symbols,
             "used_placeholder_iv_inputs": used_placeholder_iv_inputs,
