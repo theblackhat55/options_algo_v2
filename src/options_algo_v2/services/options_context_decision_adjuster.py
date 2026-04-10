@@ -126,7 +126,7 @@ def _build_adjustment(
             advisory_reasons.append("expected_move_supportive")
         else:
             score_delta += 4.0
-            reasons.append("expected_move_strong")
+            advisory_reasons.append("expected_move_strong")
 
     # PCR OI
     if pcr_oi is not None:
