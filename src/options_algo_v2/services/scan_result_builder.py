@@ -347,13 +347,15 @@ def build_scan_result(
         trade_candidates
     )
     top_trade_summary_rows = build_top_trade_summary_rows(top_trade_candidates)
-    trade_ideas = [
-        dict(item)
-        for item in build_trade_ideas(
-            trade_candidates=trade_candidates,
-            decisions=serialized_decisions,
-        )
-    ]
+    trade_ideas = _attach_trade_validation_metadata(
+        [
+            dict(item)
+            for item in build_trade_ideas(
+                trade_candidates=trade_candidates,
+                decisions=serialized_decisions,
+            )
+        ]
+    )
 
     options_context_decision_debug_by_symbol = degraded_metadata.get(
         "options_context_decision_debug_by_symbol",
