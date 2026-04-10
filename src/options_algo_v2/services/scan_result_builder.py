@@ -71,6 +71,78 @@ from options_algo_v2.services.trade_idea_diagnostics import (
 )
 
 
+def _to_float(value: object) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        text = str(value).strip()
+        if not text:
+            return None
+        return float(text)
+    except Exception:
+        return None
+
+
+def _validate_trade_idea(trade_idea: dict[str, object]) -> tuple[bool, list[str]]:
+    errors: list[str] = []
+
+    strategy_type = str(trade_idea.get("strategy_type", "") or "").strip()
+    symbol = str(trade_idea.get("symbol", "") or "").strip()
+    expiration = str(
+        trade_idea.get("expiration", "") or trade_idea.get("expiry", "") or ""
+    ).strip()
+
+    if not strategy_type:
+        errors.append("missing_strategy_type")
+    if not symbol:
+        errors.append("missing_symbol")
+    if not expiration:
+        errors.append("missing_expiration")
+
+    short_strike = _to_float(trade_idea.get("short_strike"))
+    long_strike = _to_float(trade_idea.get("long_strike"))
+    width = _to_float(trade_idea.get("width"))
+    max_risk = _to_float(trade_idea.get("max_risk"))
+    net_credit = _to_float(trade_idea.get("net_credit"))
+
+    if short_strike is not None and long_strike is not None and width is not None:
+        if abs(abs(short_strike - long_strike) - width) > 0.01:
+            errors.append("width_mismatch")
+
+    if width is not None and width <= 0:
+        errors.append("nonpositive_width")
+
+    if max_risk is not None and max_risk < 0:
+        errors.append("negative_max_risk")
+
+    if max_risk is not None and width is not None and width > 0 and max_risk == 0:
+        errors.append("zero_risk_defined_spread")
+
+    if net_credit is not None and width is not None and net_credit - width > 0.01:
+        errors.append("credit_exceeds_width")
+
+    return (len(errors) == 0, errors)
+
+
+def _attach_trade_validation_metadata(
+    trade_ideas: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    enriched: list[dict[str, object]] = []
+
+    for trade_idea in trade_ideas:
+        item = dict(trade_idea)
+        is_valid, errors = _validate_trade_idea(item)
+        item["is_structurally_valid_trade"] = is_valid
+        item["trade_validation_errors"] = errors
+        enriched.append(item)
+
+    return enriched
+
+
 def _feature_sources_by_symbol(
     feature_sources: list[dict[str, str]],
 ) -> dict[str, dict[str, str]]:
