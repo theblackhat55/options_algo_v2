@@ -5,6 +5,7 @@ from typing import TypedDict
 
 class TradeIdea(TypedDict):
     symbol: str
+    strategy_type: str
     strategy_family: str
     expiration: str
     selected_expiration: str
@@ -79,6 +80,7 @@ def build_trade_idea(
 
     return {
         "symbol": str(trade_candidate.get("symbol", "UNKNOWN")),
+        "strategy_type": strategy_family,
         "strategy_family": strategy_family,
         "expiration": expiration,
         "selected_expiration": expiration,
