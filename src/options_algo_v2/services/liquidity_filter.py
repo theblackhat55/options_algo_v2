@@ -32,7 +32,10 @@ def passes_liquidity_filter(
     if option_open_interest < min_option_open_interest:
         reasons.append("option open interest below minimum")
 
-    if option_volume < min_option_volume:
+    volume_supported_by_open_interest = (
+        option_volume >= 30 and option_open_interest >= 2000
+    )
+    if option_volume < min_option_volume and not volume_supported_by_open_interest:
         reasons.append("option volume below minimum")
 
     if bid <= 0 or ask <= 0 or ask < bid:
