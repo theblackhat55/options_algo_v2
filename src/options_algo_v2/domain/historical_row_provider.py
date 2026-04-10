@@ -10,5 +10,6 @@ class HistoricalRowProvider(Protocol):
         symbol: str,
         dataset: str,
         schema: str,
+        end_date: str | None = None,
     ) -> list[dict[str, object]]:
         ...
