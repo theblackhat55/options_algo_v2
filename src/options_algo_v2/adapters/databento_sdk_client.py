@@ -112,12 +112,12 @@ def _build_get_range_kwargs(
     else:
         resolved_end_date = _previous_business_day(datetime.now(UTC).date())
 
-    end = datetime.combine(
-        resolved_end_date,
+    end_exclusive = datetime.combine(
+        resolved_end_date + timedelta(days=1),
         datetime.min.time(),
         tzinfo=UTC,
     )
-    start = end - timedelta(days=lookback_days)
+    start = end_exclusive - timedelta(days=lookback_days)
 
     return {
         "dataset": dataset,
@@ -125,7 +125,7 @@ def _build_get_range_kwargs(
         "symbols": symbol,
         "stype_in": "raw_symbol",
         "start": start,
-        "end": end,
+        "end": end_exclusive,
         "limit": 100,
     }
 
