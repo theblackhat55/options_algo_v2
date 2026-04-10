@@ -6,7 +6,7 @@ from options_algo_v2.domain.features import DirectionalFeatures
 
 def classify_directional_state(
     features: DirectionalFeatures,
-    adx_trending_min: float = 18.0,
+    adx_trending_min: float = 16.0,
     adx_breakout_min: float = 16.0,
     rsi_bullish_min: float = 45.0,
     rsi_bullish_max: float = 85.0,
@@ -16,14 +16,12 @@ def classify_directional_state(
 ) -> DirectionalState:
     bullish_setup = (
         features.close_above_20dma
-        and features.close_above_50dma
         and features.adx >= adx_trending_min
         and rsi_bullish_min <= features.rsi <= rsi_bullish_max
     )
 
     bearish_setup = (
         features.close_below_20dma
-        and features.close_below_50dma
         and features.adx >= adx_trending_min
         and rsi_bearish_min <= features.rsi <= rsi_bearish_max
     )
