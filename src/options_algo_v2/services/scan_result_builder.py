@@ -372,6 +372,22 @@ def build_scan_result(
         "feature_debug_by_symbol": _build_feature_debug_by_symbol(feature_sources),
         "decision_trace_by_symbol": _build_decision_trace_by_symbol(serialized_decisions),
         "runtime_mode": get_runtime_mode(),
+        "run_quality": (
+            "mock"
+            if get_historical_row_provider_name() == "mock"
+            else "live"
+            if get_historical_row_provider_name() in {"databento", "sqlite"}
+            else "unknown"
+        ),
+        "is_mock": get_historical_row_provider_name() == "mock",
+        "is_degraded": bool(
+            degraded_metadata.get("degraded_live_mode")
+            or degraded_metadata.get("used_mock_historical_fallback")
+            or degraded_metadata.get("used_breadth_override")
+            or degraded_metadata.get("used_placeholder_iv_inputs")
+            or degraded_metadata.get("used_placeholder_liquidity_inputs")
+        ),
+        "is_reviewable": get_historical_row_provider_name() in {"databento", "sqlite"},
         "databento": build_databento_runtime_info(),
         "historical_row_provider": get_historical_row_provider_name(),
         "historical_row_provider_source": get_historical_row_provider_source(),
