@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from options_algo_v2.domain.enums import MarketRegime
@@ -585,6 +585,16 @@ def _build_liquidity_debug_info(
     }
 
 
+def _resolve_requested_end_date_for_history(end_date: str | None) -> str | None:
+    if not end_date:
+        return None
+    current = datetime.strptime(end_date, "%Y-%m-%d").date()
+    while current.weekday() >= 5:
+        current -= timedelta(days=1)
+    return current.isoformat()
+
+
+
 def _build_historical_provider_diagnostic(
     *,
     symbol: str,
@@ -601,13 +611,22 @@ def _build_historical_provider_diagnostic(
         if ts_event is not None:
             latest_row_date = str(ts_event)[:10]
 
+    resolved_end_date = _resolve_requested_end_date_for_history(end_date)
+    is_stale_relative_to_resolved_end_date = (
+        latest_row_date is not None
+        and resolved_end_date is not None
+        and str(latest_row_date) < str(resolved_end_date)
+    )
+
     return {
         "symbol": symbol,
         "provider_mode": provider_mode,
         "returned_row_count": len(bar_rows),
         "requested_end_date": end_date,
+        "resolved_end_date": resolved_end_date,
         "has_rows": bool(bar_rows),
         "latest_row_date": latest_row_date,
+        "is_stale_relative_to_resolved_end_date": is_stale_relative_to_resolved_end_date,
         "historical_row_provider": get_historical_row_provider_name(),
         "historical_row_provider_source": get_historical_row_provider_source(),
     }
@@ -1032,9 +1051,7 @@ def run_nightly_scan(
                 [
                     symbol
                     for symbol, payload in historical_provider_diagnostics_by_symbol.items()
-                    if payload.get("latest_row_date") is not None
-                    and end_date is not None
-                    and str(payload.get("latest_row_date")) < str(end_date)
+                    if payload.get("is_stale_relative_to_resolved_end_date")
                 ]
             ),
             "used_breadth_override": bool(breadth_override_symbols),
