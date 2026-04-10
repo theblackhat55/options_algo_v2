@@ -944,11 +944,21 @@ def run_nightly_scan(
             end_date=end_date,
         )
         historical_provider_modes[symbol] = provider_mode
-        historical_provider_diagnostics_by_symbol[symbol] = _build_historical_provider_diagnostic(
-            symbol=symbol,
-            provider_mode=provider_mode,
-            bar_rows=bar_rows,
-            end_date=end_date,
+        get_provider_diagnostics = getattr(row_provider, "get_last_request_diagnostics", None)
+        if callable(get_provider_diagnostics):
+            provider_diagnostics = get_provider_diagnostics(symbol)
+        else:
+            provider_diagnostics = {}
+
+        historical_provider_diagnostics_by_symbol[symbol] = (
+            provider_diagnostics
+            if provider_diagnostics
+            else _build_historical_provider_diagnostic(
+                symbol=symbol,
+                provider_mode=provider_mode,
+                bar_rows=bar_rows,
+                end_date=end_date,
+            )
         )
 
         symbol_quote_quality_counts = _build_quote_quality_counts(snapshot)

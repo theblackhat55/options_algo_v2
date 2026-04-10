@@ -210,12 +210,68 @@ class DatabentoHistoricalRowProvider(HistoricalRowProvider):
         )
 
 
-@dataclass(frozen=True)
+@dataclass
 class SQLiteFirstHistoricalRowProvider(HistoricalRowProvider):
     primary: DatabentoHistoricalRowProvider
     db_path: Path
     sqlite_min_rows: int
     source: str = "sqlite-first"
+    last_request_diagnostics_by_symbol: dict[str, dict[str, object]] | None = None
+
+    def __post_init__(self) -> None:
+        if self.last_request_diagnostics_by_symbol is None:
+            self.last_request_diagnostics_by_symbol = {}
+
+    def get_last_request_diagnostics(self, symbol: str) -> dict[str, object]:
+        return dict((self.last_request_diagnostics_by_symbol or {}).get(symbol, {}))
+
+    def _record_request_diagnostics(
+        self,
+        *,
+        symbol: str,
+        resolved_end_date: str | None,
+        max_staleness_days: int,
+        stale_rows_allowed: bool,
+        cache_row_count: int,
+        cache_latest_date: str | None,
+        cache_was_sufficient: bool,
+        cache_was_fresh: bool,
+        refresh_attempted: bool,
+        refresh_row_count: int,
+        refresh_latest_date: str | None,
+        refresh_succeeded: bool,
+        refreshed_cache_row_count: int,
+        refreshed_cache_latest_date: str | None,
+        refreshed_cache_was_sufficient: bool,
+        refreshed_cache_was_fresh: bool,
+        returned_row_count: int,
+        returned_latest_date: str | None,
+        returned_source_mode: str,
+    ) -> None:
+        if self.last_request_diagnostics_by_symbol is None:
+            self.last_request_diagnostics_by_symbol = {}
+        self.last_request_diagnostics_by_symbol[symbol] = {
+            "symbol": symbol,
+            "db_path": str(self.db_path),
+            "resolved_end_date": resolved_end_date,
+            "max_staleness_days": int(max_staleness_days),
+            "stale_rows_allowed": bool(stale_rows_allowed),
+            "cache_row_count": int(cache_row_count),
+            "cache_latest_date": cache_latest_date,
+            "cache_was_sufficient": bool(cache_was_sufficient),
+            "cache_was_fresh": bool(cache_was_fresh),
+            "refresh_attempted": bool(refresh_attempted),
+            "refresh_row_count": int(refresh_row_count),
+            "refresh_latest_date": refresh_latest_date,
+            "refresh_succeeded": bool(refresh_succeeded),
+            "refreshed_cache_row_count": int(refreshed_cache_row_count),
+            "refreshed_cache_latest_date": refreshed_cache_latest_date,
+            "refreshed_cache_was_sufficient": bool(refreshed_cache_was_sufficient),
+            "refreshed_cache_was_fresh": bool(refreshed_cache_was_fresh),
+            "returned_row_count": int(returned_row_count),
+            "returned_latest_date": returned_latest_date,
+            "returned_source_mode": returned_source_mode,
+        }
 
     def get_bar_rows(
         self,
@@ -248,7 +304,29 @@ class SQLiteFirstHistoricalRowProvider(HistoricalRowProvider):
         )
 
         if cached_is_sufficient and cached_is_fresh:
-            return _rows_from_bars(cached_bars[-_get_lookback_days():])
+            returned_rows = _rows_from_bars(cached_bars[-_get_lookback_days():])
+            self._record_request_diagnostics(
+                symbol=symbol,
+                resolved_end_date=resolved_end_date,
+                max_staleness_days=max_staleness_days,
+                stale_rows_allowed=allow_stale_rows,
+                cache_row_count=len(cached_bars),
+                cache_latest_date=cached_latest_date,
+                cache_was_sufficient=cached_is_sufficient,
+                cache_was_fresh=cached_is_fresh,
+                refresh_attempted=False,
+                refresh_row_count=0,
+                refresh_latest_date=None,
+                refresh_succeeded=False,
+                refreshed_cache_row_count=len(cached_bars),
+                refreshed_cache_latest_date=cached_latest_date,
+                refreshed_cache_was_sufficient=cached_is_sufficient,
+                refreshed_cache_was_fresh=cached_is_fresh,
+                returned_row_count=len(returned_rows),
+                returned_latest_date=_latest_row_date(returned_rows),
+                returned_source_mode="sqlite_cache_fresh",
+            )
+            return returned_rows
 
         live_rows = self.primary.get_bar_rows(
             symbol=symbol,
@@ -264,6 +342,9 @@ class SQLiteFirstHistoricalRowProvider(HistoricalRowProvider):
             max_staleness_days=max_staleness_days,
         )
 
+        refresh_attempted = True
+        refresh_succeeded = False
+
         if live_rows:
             fetched_bars = _bars_from_rows(live_rows)
             if fetched_bars:
@@ -273,6 +354,7 @@ class SQLiteFirstHistoricalRowProvider(HistoricalRowProvider):
                     db_path=self.db_path,
                     source=self.primary.source,
                 )
+                refresh_succeeded = True
 
         refreshed_bars = load_underlying_bars(
             symbol=symbol,
@@ -288,17 +370,125 @@ class SQLiteFirstHistoricalRowProvider(HistoricalRowProvider):
         )
 
         if refreshed_bars and refreshed_is_sufficient and refreshed_is_fresh:
-            return _rows_from_bars(refreshed_bars[-_get_lookback_days():])
+            returned_rows = _rows_from_bars(refreshed_bars[-_get_lookback_days():])
+            self._record_request_diagnostics(
+                symbol=symbol,
+                resolved_end_date=resolved_end_date,
+                max_staleness_days=max_staleness_days,
+                stale_rows_allowed=allow_stale_rows,
+                cache_row_count=len(cached_bars),
+                cache_latest_date=cached_latest_date,
+                cache_was_sufficient=cached_is_sufficient,
+                cache_was_fresh=cached_is_fresh,
+                refresh_attempted=refresh_attempted,
+                refresh_row_count=len(live_rows),
+                refresh_latest_date=fetched_latest_date,
+                refresh_succeeded=refresh_succeeded,
+                refreshed_cache_row_count=len(refreshed_bars),
+                refreshed_cache_latest_date=refreshed_latest_date,
+                refreshed_cache_was_sufficient=refreshed_is_sufficient,
+                refreshed_cache_was_fresh=refreshed_is_fresh,
+                returned_row_count=len(returned_rows),
+                returned_latest_date=_latest_row_date(returned_rows),
+                returned_source_mode="sqlite_refreshed",
+            )
+            return returned_rows
 
         if live_rows and fetched_is_fresh:
+            self._record_request_diagnostics(
+                symbol=symbol,
+                resolved_end_date=resolved_end_date,
+                max_staleness_days=max_staleness_days,
+                stale_rows_allowed=allow_stale_rows,
+                cache_row_count=len(cached_bars),
+                cache_latest_date=cached_latest_date,
+                cache_was_sufficient=cached_is_sufficient,
+                cache_was_fresh=cached_is_fresh,
+                refresh_attempted=refresh_attempted,
+                refresh_row_count=len(live_rows),
+                refresh_latest_date=fetched_latest_date,
+                refresh_succeeded=refresh_succeeded,
+                refreshed_cache_row_count=len(refreshed_bars),
+                refreshed_cache_latest_date=refreshed_latest_date,
+                refreshed_cache_was_sufficient=refreshed_is_sufficient,
+                refreshed_cache_was_fresh=refreshed_is_fresh,
+                returned_row_count=len(live_rows),
+                returned_latest_date=fetched_latest_date,
+                returned_source_mode="live_rows_fresh",
+            )
             return live_rows
 
         if allow_stale_rows:
             if refreshed_bars:
-                return _rows_from_bars(refreshed_bars[-_get_lookback_days():])
+                returned_rows = _rows_from_bars(refreshed_bars[-_get_lookback_days():])
+                self._record_request_diagnostics(
+                    symbol=symbol,
+                    resolved_end_date=resolved_end_date,
+                    max_staleness_days=max_staleness_days,
+                    stale_rows_allowed=allow_stale_rows,
+                    cache_row_count=len(cached_bars),
+                    cache_latest_date=cached_latest_date,
+                    cache_was_sufficient=cached_is_sufficient,
+                    cache_was_fresh=cached_is_fresh,
+                    refresh_attempted=refresh_attempted,
+                    refresh_row_count=len(live_rows),
+                    refresh_latest_date=fetched_latest_date,
+                    refresh_succeeded=refresh_succeeded,
+                    refreshed_cache_row_count=len(refreshed_bars),
+                    refreshed_cache_latest_date=refreshed_latest_date,
+                    refreshed_cache_was_sufficient=refreshed_is_sufficient,
+                    refreshed_cache_was_fresh=refreshed_is_fresh,
+                    returned_row_count=len(returned_rows),
+                    returned_latest_date=_latest_row_date(returned_rows),
+                    returned_source_mode="sqlite_stale_allowed",
+                )
+                return returned_rows
             if cached_bars:
-                return _rows_from_bars(cached_bars[-_get_lookback_days():])
+                returned_rows = _rows_from_bars(cached_bars[-_get_lookback_days():])
+                self._record_request_diagnostics(
+                    symbol=symbol,
+                    resolved_end_date=resolved_end_date,
+                    max_staleness_days=max_staleness_days,
+                    stale_rows_allowed=allow_stale_rows,
+                    cache_row_count=len(cached_bars),
+                    cache_latest_date=cached_latest_date,
+                    cache_was_sufficient=cached_is_sufficient,
+                    cache_was_fresh=cached_is_fresh,
+                    refresh_attempted=refresh_attempted,
+                    refresh_row_count=len(live_rows),
+                    refresh_latest_date=fetched_latest_date,
+                    refresh_succeeded=refresh_succeeded,
+                    refreshed_cache_row_count=len(refreshed_bars),
+                    refreshed_cache_latest_date=refreshed_latest_date,
+                    refreshed_cache_was_sufficient=refreshed_is_sufficient,
+                    refreshed_cache_was_fresh=refreshed_is_fresh,
+                    returned_row_count=len(returned_rows),
+                    returned_latest_date=_latest_row_date(returned_rows),
+                    returned_source_mode="sqlite_cache_stale_allowed",
+                )
+                return returned_rows
 
+        self._record_request_diagnostics(
+            symbol=symbol,
+            resolved_end_date=resolved_end_date,
+            max_staleness_days=max_staleness_days,
+            stale_rows_allowed=allow_stale_rows,
+            cache_row_count=len(cached_bars),
+            cache_latest_date=cached_latest_date,
+            cache_was_sufficient=cached_is_sufficient,
+            cache_was_fresh=cached_is_fresh,
+            refresh_attempted=refresh_attempted,
+            refresh_row_count=len(live_rows),
+            refresh_latest_date=fetched_latest_date,
+            refresh_succeeded=refresh_succeeded,
+            refreshed_cache_row_count=len(refreshed_bars),
+            refreshed_cache_latest_date=refreshed_latest_date,
+            refreshed_cache_was_sufficient=refreshed_is_sufficient,
+            refreshed_cache_was_fresh=refreshed_is_fresh,
+            returned_row_count=len(live_rows),
+            returned_latest_date=fetched_latest_date,
+            returned_source_mode="live_rows_stale_or_empty",
+        )
         return live_rows
 
 
