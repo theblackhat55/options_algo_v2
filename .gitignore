@@ -22,3 +22,5 @@ logs/
 
 # local admin backups
 crontab.backup*
+
+*.bak

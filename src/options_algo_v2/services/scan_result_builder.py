@@ -376,7 +376,7 @@ def build_scan_result(
             "mock"
             if get_historical_row_provider_name() == "mock"
             else "live"
-            if get_historical_row_provider_name() in {"databento", "sqlite"}
+            if get_historical_row_provider_name() in {"databento", "sqlite", "sqlite-first"}
             else "unknown"
         ),
         "is_mock": get_historical_row_provider_name() == "mock",
@@ -387,7 +387,7 @@ def build_scan_result(
             or degraded_metadata.get("used_placeholder_iv_inputs")
             or degraded_metadata.get("used_placeholder_liquidity_inputs")
         ),
-        "is_reviewable": get_historical_row_provider_name() in {"databento", "sqlite"},
+        "is_reviewable": get_historical_row_provider_name() in {"databento", "sqlite", "sqlite-first"},
         "databento": build_databento_runtime_info(),
         "historical_row_provider": get_historical_row_provider_name(),
         "historical_row_provider_source": get_historical_row_provider_source(),
