@@ -19,6 +19,7 @@ def default_options_context_db_path(repo_root: Path | None = None) -> Path:
 def load_options_context_payload(
     path: Path | None = None,
     db_path: Path | None = None,
+    max_as_of_date: str | None = None,
 ) -> dict[str, Any]:
     del path  # JSON fallback intentionally removed
 
@@ -36,16 +37,31 @@ def load_options_context_payload(
         conn = sqlite3.connect(str(target))
         conn.row_factory = sqlite3.Row
         try:
-            rows = conn.execute(
-                """
-                SELECT *
-                FROM options_context_daily
-                WHERE as_of_date = (
-                    SELECT MAX(as_of_date) FROM options_context_daily
-                )
-                ORDER BY symbol
-                """
-            ).fetchall()
+            if max_as_of_date:
+                rows = conn.execute(
+                    """
+                    SELECT *
+                    FROM options_context_daily
+                    WHERE as_of_date = (
+                        SELECT MAX(as_of_date)
+                        FROM options_context_daily
+                        WHERE as_of_date <= ?
+                    )
+                    ORDER BY symbol
+                    """,
+                    (max_as_of_date,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT *
+                    FROM options_context_daily
+                    WHERE as_of_date = (
+                        SELECT MAX(as_of_date) FROM options_context_daily
+                    )
+                    ORDER BY symbol
+                    """
+                ).fetchall()
         finally:
             conn.close()
     except Exception as exc:

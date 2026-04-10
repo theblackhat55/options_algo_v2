@@ -897,7 +897,9 @@ def run_nightly_scan(
             source_provider_counts=options_context_payload.get("source_provider_counts"),
         )
     else:
-        options_context_payload = load_options_context_payload()
+        options_context_payload = load_options_context_payload(
+            max_as_of_date=_resolve_requested_end_date_for_history(end_date),
+        )
         options_context_index = build_options_context_index(options_context_payload)
         options_context_by_symbol = build_options_context_by_symbol(
             selected_symbols,
