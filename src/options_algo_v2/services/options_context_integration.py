@@ -22,6 +22,11 @@ def _to_float(value: object) -> float | None:
 def summarize_options_context_coverage(
     symbols: list[str],
     context_index: dict[str, dict[str, Any]],
+    *,
+    resolved_end_date: str | None = None,
+    latest_as_of_date: str | None = None,
+    latest_as_of_utc: str | None = None,
+    source_provider_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     normalized = [s.strip().upper() for s in symbols if isinstance(s, str) and s.strip()]
     matched = [s for s in normalized if s in context_index]
@@ -99,6 +104,21 @@ def summarize_options_context_coverage(
         reverse=True,
     )[:5]
 
+    stale_symbols: list[str] = []
+    fresh_symbols: list[str] = []
+
+    for symbol in matched:
+        row = context_index[symbol]
+        row_as_of_date = row.get("as_of_date")
+        if (
+            isinstance(row_as_of_date, str)
+            and resolved_end_date is not None
+            and row_as_of_date < resolved_end_date
+        ):
+            stale_symbols.append(symbol)
+        else:
+            fresh_symbols.append(symbol)
+
     return {
         "options_context_symbol_count": len(normalized),
         "options_context_matched_count": len(matched),
@@ -111,6 +131,13 @@ def summarize_options_context_coverage(
         "options_context_top_gamma_flip_risk_symbols": gamma_flip_risk_leaders,
         "options_context_top_gex_symbols": gex_leaders,
         "options_context_top_front_gamma_symbols": front_gamma_leaders,
+        "options_context_latest_as_of_date": latest_as_of_date,
+        "options_context_latest_as_of_utc": latest_as_of_utc,
+        "options_context_source_provider_counts": source_provider_counts or {},
+        "options_context_resolved_end_date": resolved_end_date,
+        "options_context_fresh_count": len(fresh_symbols),
+        "options_context_stale_count": len(stale_symbols),
+        "options_context_stale_symbols": stale_symbols[:20],
     }
 
 

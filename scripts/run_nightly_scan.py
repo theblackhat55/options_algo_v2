@@ -891,6 +891,10 @@ def run_nightly_scan(
         options_context_summary = summarize_options_context_coverage(
             selected_symbols,
             options_context_index,
+            resolved_end_date=_resolve_requested_end_date_for_history(end_date),
+            latest_as_of_date=options_context_payload.get("latest_as_of_date"),
+            latest_as_of_utc=options_context_payload.get("latest_as_of_utc"),
+            source_provider_counts=options_context_payload.get("source_provider_counts"),
         )
     else:
         options_context_payload = load_options_context_payload()
@@ -902,6 +906,10 @@ def run_nightly_scan(
         options_context_summary = summarize_options_context_coverage(
             selected_symbols,
             options_context_index,
+            resolved_end_date=_resolve_requested_end_date_for_history(end_date),
+            latest_as_of_date=options_context_payload.get("latest_as_of_date"),
+            latest_as_of_utc=options_context_payload.get("latest_as_of_utc"),
+            source_provider_counts=options_context_payload.get("source_provider_counts"),
         )
 
     raw_features = []

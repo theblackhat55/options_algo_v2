@@ -79,11 +79,35 @@ def load_options_context_payload(
         item.pop("missing_fields_json", None)
         payload_rows.append(item)
 
+    latest_as_of_date = None
+    latest_as_of_utc = None
+    source_provider_counts: dict[str, int] = {}
+
+    for item in payload_rows:
+        as_of_date = item.get("as_of_date")
+        as_of_utc = item.get("as_of_utc")
+        source_provider = item.get("source_provider") or "unknown"
+
+        if isinstance(as_of_date, str):
+            if latest_as_of_date is None or as_of_date > latest_as_of_date:
+                latest_as_of_date = as_of_date
+
+        if isinstance(as_of_utc, str):
+            if latest_as_of_utc is None or as_of_utc > latest_as_of_utc:
+                latest_as_of_utc = as_of_utc
+
+        source_provider_counts[str(source_provider)] = (
+            source_provider_counts.get(str(source_provider), 0) + 1
+        )
+
     return {
         "source": "sqlite",
         "db_path": str(target),
         "row_count": len(payload_rows),
         "rows": payload_rows,
+        "latest_as_of_date": latest_as_of_date,
+        "latest_as_of_utc": latest_as_of_utc,
+        "source_provider_counts": source_provider_counts,
     }
 
 
