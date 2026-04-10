@@ -18,10 +18,10 @@ def test_build_sample_raw_features_for_pass_symbol() -> None:
     assert raw.close == 210.0
     assert raw.dma20 == 208.0
     assert raw.dma50 == 205.0
-    assert raw.adx14 == 22.0
+    assert raw.adx14 == 35.0
     assert raw.iv_rank == 70.0
-    assert raw.iv_hv_ratio == 1.30
-    assert raw.market_breadth_pct_above_20dma == 60.0
+    assert raw.iv_hv_ratio == 1.45
+    assert raw.market_breadth_pct_above_20dma == 65.0
     assert raw.atr20 == 2.0
 
 
@@ -39,10 +39,10 @@ def test_build_sample_raw_features_for_extended_symbol() -> None:
     assert raw.close == 520.0
     assert raw.dma20 == 515.0
     assert raw.dma50 == 510.0
-    assert raw.adx14 == 22.0
+    assert raw.adx14 == 35.0
     assert raw.iv_rank == 70.0
-    assert raw.iv_hv_ratio == 1.30
-    assert raw.market_breadth_pct_above_20dma == 60.0
+    assert raw.iv_hv_ratio == 1.45
+    assert raw.market_breadth_pct_above_20dma == 65.0
     assert raw.atr20 == 2.0
 
 

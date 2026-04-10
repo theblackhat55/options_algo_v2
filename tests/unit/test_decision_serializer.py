@@ -25,6 +25,9 @@ def test_serialize_candidate_decision_for_passed_case() -> None:
         close=102.0,
         dma20=100.0,
         atr20=2.0,
+        adx14=40.0,
+        iv_hv_ratio=1.50,
+        market_breadth_pct_above_20dma=65.0,
         expected_move_fit=True,
     )
 
@@ -63,6 +66,9 @@ def test_serialize_candidate_decision_for_rejected_case() -> None:
         close=102.0,
         dma20=100.0,
         atr20=2.0,
+        adx14=40.0,
+        iv_hv_ratio=1.50,
+        market_breadth_pct_above_20dma=65.0,
         expected_move_fit=True,
     )
 

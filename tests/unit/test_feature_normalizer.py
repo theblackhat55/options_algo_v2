@@ -67,7 +67,7 @@ def test_normalize_extended_bullish_to_no_trade() -> None:
     payload = normalize_raw_features_to_payload(raw)
 
     assert payload.directional_state == DirectionalState.NO_TRADE
-    assert payload.expected_move_fit is False
+    assert payload.expected_move_fit is True
 
 
 def test_normalize_raw_features_to_neutral_normal_iv_payload() -> None:

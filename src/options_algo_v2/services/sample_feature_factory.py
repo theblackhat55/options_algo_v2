@@ -18,18 +18,18 @@ def build_sample_raw_features_from_snapshot(
     if symbol in pass_symbols:
         dma20 = close - 2.0
         dma50 = close - 5.0
-        adx14 = 22.0
+        adx14 = 35.0
         iv_rank = 70.0
-        iv_hv_ratio = 1.30
-        breadth = 60.0
+        iv_hv_ratio = 1.45
+        breadth = 65.0
         atr20 = 2.0
     elif symbol in extended_symbols:
         dma20 = close - 5.0
         dma50 = close - 10.0
-        adx14 = 22.0
+        adx14 = 35.0
         iv_rank = 70.0
-        iv_hv_ratio = 1.30
-        breadth = 60.0
+        iv_hv_ratio = 1.45
+        breadth = 65.0
         atr20 = 2.0
     else:
         dma20 = close

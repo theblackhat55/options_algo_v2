@@ -13,12 +13,14 @@ def test_databento_live_historical_row_client_normalizes_rows() -> None:
         dataset: str,
         schema: str,
         api_key: str,
+        end_date: str | None = None,
     ) -> list[dict[str, object]]:
         assert symbol == "AAPL"
         assert lookback_days == 50
         assert dataset == "XNAS.ITCH"
         assert schema == "ohlcv-1d"
         assert api_key == "test-key"
+        assert end_date is None
         return [
             {
                 "timestamp": "2026-03-10T21:00:00Z",
@@ -81,12 +83,14 @@ def test_databento_live_historical_row_client_skips_invalid_rows() -> None:
         dataset: str,
         schema: str,
         api_key: str,
+        end_date: str | None = None,
     ) -> list[dict[str, object]]:
         _ = symbol
         _ = lookback_days
         _ = dataset
         _ = schema
         _ = api_key
+        _ = end_date
         return [
             {
                 "timestamp": "2026-03-10T21:00:00Z",

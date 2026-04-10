@@ -30,6 +30,9 @@ def test_decision_engine_returns_passed_candidate() -> None:
         close=102.0,
         dma20=100.0,
         atr20=2.0,
+        adx14=40.0,
+        iv_hv_ratio=1.50,
+        market_breadth_pct_above_20dma=65.0,
         expected_move_fit=True,
     )
 
@@ -62,6 +65,9 @@ def test_decision_engine_rejects_for_earnings_event() -> None:
         close=102.0,
         dma20=100.0,
         atr20=2.0,
+        adx14=40.0,
+        iv_hv_ratio=1.50,
+        market_breadth_pct_above_20dma=65.0,
         expected_move_fit=True,
     )
 
@@ -90,6 +96,9 @@ def test_decision_engine_rejects_for_liquidity_failure() -> None:
         close=98.0,
         dma20=100.0,
         atr20=2.0,
+        adx14=40.0,
+        iv_hv_ratio=1.50,
+        market_breadth_pct_above_20dma=65.0,
         expected_move_fit=True,
     )
 
@@ -120,6 +129,9 @@ def test_decision_engine_rejects_for_extension_failure() -> None:
         close=105.0,
         dma20=100.0,
         atr20=2.0,
+        adx14=40.0,
+        iv_hv_ratio=1.50,
+        market_breadth_pct_above_20dma=65.0,
         expected_move_fit=True,
     )
 
@@ -149,6 +161,9 @@ def test_decision_engine_returns_zero_score_for_selector_rejection() -> None:
         close=102.0,
         dma20=100.0,
         atr20=2.0,
+        adx14=40.0,
+        iv_hv_ratio=1.50,
+        market_breadth_pct_above_20dma=65.0,
         expected_move_fit=True,
     )
 

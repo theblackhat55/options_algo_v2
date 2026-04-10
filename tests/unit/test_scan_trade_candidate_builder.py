@@ -34,6 +34,9 @@ def _make_passed_decision():
             close=150.0,
             dma20=148.0,
             atr20=3.5,
+            adx14=40.0,
+            iv_hv_ratio=1.50,
+            market_breadth_pct_above_20dma=65.0,
             expected_move_fit=True,
         )
     )

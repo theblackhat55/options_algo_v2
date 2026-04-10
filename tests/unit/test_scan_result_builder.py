@@ -30,6 +30,9 @@ def _make_passed_decision():
         close=102.0,
         dma20=100.0,
         atr20=2.0,
+        adx14=40.0,
+        iv_hv_ratio=1.50,
+        market_breadth_pct_above_20dma=65.0,
         expected_move_fit=True,
     )
     return evaluate_candidate_decision(evaluation_input)
@@ -55,6 +58,9 @@ def _make_rejected_decision():
         close=102.0,
         dma20=100.0,
         atr20=2.0,
+        adx14=40.0,
+        iv_hv_ratio=1.50,
+        market_breadth_pct_above_20dma=65.0,
         expected_move_fit=True,
     )
     return evaluate_candidate_decision(evaluation_input)

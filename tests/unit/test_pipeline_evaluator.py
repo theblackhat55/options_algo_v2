@@ -33,6 +33,9 @@ def test_payload_to_evaluation_input_maps_fields_correctly() -> None:
         close=102.0,
         dma20=100.0,
         atr20=2.0,
+        adx14=40.0,
+        iv_hv_ratio=1.50,
+        market_breadth_pct_above_20dma=65.0,
         expected_move_fit=True,
     )
 
@@ -64,6 +67,9 @@ def test_evaluate_pipeline_payload_returns_qualified_decision() -> None:
         close=102.0,
         dma20=100.0,
         atr20=2.0,
+        adx14=40.0,
+        iv_hv_ratio=1.50,
+        market_breadth_pct_above_20dma=65.0,
         expected_move_fit=True,
     )
 
@@ -95,6 +101,9 @@ def test_evaluate_pipeline_payload_returns_rejected_decision() -> None:
         close=102.0,
         dma20=100.0,
         atr20=2.0,
+        adx14=40.0,
+        iv_hv_ratio=1.50,
+        market_breadth_pct_above_20dma=65.0,
         expected_move_fit=True,
     )
 

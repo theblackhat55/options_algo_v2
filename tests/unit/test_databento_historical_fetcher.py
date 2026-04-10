@@ -12,11 +12,15 @@ def test_fetch_databento_daily_rows_raises_when_sdk_unavailable(
         symbol: str,
         dataset: str,
         schema: str,
+        lookback_days: int = 60,
+        end_date: str | None = None,
     ) -> list[dict[str, object]]:
         _ = self
         _ = symbol
         _ = dataset
         _ = schema
+        _ = lookback_days
+        _ = end_date
         raise RuntimeError("databento package is not installed")
 
     monkeypatch.setattr(
