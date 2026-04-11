@@ -22,6 +22,7 @@ from options_algo_v2.services.decision_diagnostics import (
     count_signal_states,
     count_soft_penalty_reasons,
     count_strategy_types,
+    directional_failure_summary,
     failure_archetype_by_symbol,
     failure_archetype_review_slices,
     highest_score_failed_decisions,
@@ -480,6 +481,7 @@ def build_scan_result(
         "failure_archetype_review_slices": failure_archetype_review_slices(
             serialized_decisions
         ),
+        "directional_failure_summary": directional_failure_summary(serialized_decisions),
         "passed_with_soft_penalties_symbols": passed_with_soft_penalties_symbols,
         "passed_with_soft_penalties_count": len(passed_with_soft_penalties_symbols),
         "near_threshold_failures": near_threshold_failures,

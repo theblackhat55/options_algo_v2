@@ -380,3 +380,36 @@ def failure_archetype_review_slices(
         )
         for archetype in archetypes
     }
+
+
+def directional_failure_summary(serialized_decisions) -> dict[str, object]:
+    rows = [
+        item for item in serialized_decisions
+        if classify_failure_archetype(item) == "directional_non_actionable"
+    ]
+
+    state_counts: dict[str, int] = {}
+    blocker_counts: dict[str, int] = {}
+    symbols: list[str] = []
+
+    for item in rows:
+        symbol = item.get("symbol")
+        if isinstance(symbol, str) and symbol:
+            symbols.append(symbol)
+
+        state = str(item.get("directional_state") or "UNKNOWN")
+        state_counts[state] = state_counts.get(state, 0) + 1
+
+        diagnostics = item.get("directional_diagnostics") or {}
+        blockers = diagnostics.get("directional_blockers") if isinstance(diagnostics, dict) else []
+        if isinstance(blockers, list):
+            for blocker in blockers:
+                key = str(blocker)
+                blocker_counts[key] = blocker_counts.get(key, 0) + 1
+
+    return {
+        "count": len(rows),
+        "symbols": symbols,
+        "directional_state_counts": dict(sorted(state_counts.items())),
+        "directional_blocker_counts": dict(sorted(blocker_counts.items())),
+    }
