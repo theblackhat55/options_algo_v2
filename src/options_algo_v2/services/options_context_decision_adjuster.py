@@ -257,16 +257,43 @@ def apply_options_context_to_decisions(
             if reason not in rejection_reasons:
                 rejection_reasons.append(reason)
 
-        has_non_score_rejections = len(rejection_reasons) > 0
+        blocking_reasons = {
+            reason
+            for reason in rejection_reasons
+            if reason not in {
+                "candidate score below minimum threshold",
+                "options_context_low_confidence",
+                "options_context_medium_confidence",
+                "thin_options_regime",
+                "limited_options_regime",
+                "regime_put_heavy",
+                "regime_call_heavy",
+                "expected_move_extremely_small",
+                "expected_move_too_small",
+                "pcr_oi_extreme_put_heavy",
+                "pcr_oi_put_heavy",
+                "pcr_oi_extreme_call_heavy",
+                "pcr_oi_call_heavy",
+                "pcr_volume_extreme_put_heavy",
+                "pcr_volume_extreme_call_heavy",
+                "extreme_put_skew",
+                "elevated_put_skew",
+                "call_skew_extreme",
+                "weak_bid_ask_coverage",
+                "weak_iv_coverage",
+                "weak_delta_coverage",
+            }
+        }
 
         if hard_reject:
-            final_passed = False
-        else:
-            score_meets_threshold = new_final_score >= float(decision.min_score_required)
-            if not score_meets_threshold:
-                if "candidate score below minimum threshold" not in rejection_reasons:
-                    rejection_reasons.append("candidate score below minimum threshold")
-            final_passed = score_meets_threshold and not has_non_score_rejections
+            blocking_reasons.add("options_context_untradable")
+
+        score_meets_threshold = new_final_score >= float(decision.min_score_required)
+        if not score_meets_threshold:
+            if "candidate score below minimum threshold" not in rejection_reasons:
+                rejection_reasons.append("candidate score below minimum threshold")
+
+        final_passed = score_meets_threshold and not blocking_reasons
 
         adjusted_decision = replace(
             decision,
