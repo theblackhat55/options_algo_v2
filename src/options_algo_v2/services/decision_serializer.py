@@ -121,6 +121,49 @@ def _directional_diagnostics(decision: CandidateDecision) -> dict[str, object]:
     }
 
 
+def _blocking_reasons(decision: CandidateDecision) -> list[str]:
+    blocking: list[str] = []
+
+    for reason in list(decision.event_result.reasons):
+        if reason not in blocking:
+            blocking.append(reason)
+
+    for reason in list(decision.liquidity_result.reasons):
+        if reason not in blocking:
+            blocking.append(reason)
+
+    for reason in list(decision.extension_result.reasons):
+        if reason not in blocking:
+            blocking.append(reason)
+
+    for reason in list(decision.rejection_reasons):
+        if reason == "candidate score below minimum threshold":
+            if reason not in blocking:
+                blocking.append(reason)
+        elif reason == "options_context_untradable":
+            if reason not in blocking:
+                blocking.append(reason)
+        elif reason == "directional state is not actionable":
+            if reason not in blocking:
+                blocking.append(reason)
+        elif reason == "strategy not permitted in current regime":
+            if reason not in blocking:
+                blocking.append(reason)
+
+    return blocking
+
+
+def _soft_penalty_reasons(decision: CandidateDecision) -> list[str]:
+    blocking = set(_blocking_reasons(decision))
+    soft: list[str] = []
+
+    for reason in list(decision.rejection_reasons):
+        if reason not in blocking and reason not in soft:
+            soft.append(reason)
+
+    return soft
+
+
 def serialize_candidate_decision(
     decision: CandidateDecision,
 ) -> dict[str, object]:
@@ -135,6 +178,8 @@ def serialize_candidate_decision(
         "final_score": decision.final_score,
         "min_score_required": decision.min_score_required,
         "rejection_reasons": list(decision.rejection_reasons),
+        "blocking_reasons": _blocking_reasons(decision),
+        "soft_penalty_reasons": _soft_penalty_reasons(decision),
         "rationale": list(decision.candidate.rationale),
         "event_filter": {
             "passed": decision.event_result.passed,
@@ -148,6 +193,14 @@ def serialize_candidate_decision(
             "passed": decision.extension_result.passed,
             "reasons": list(decision.extension_result.reasons),
         },
+        "underlying_price": decision.underlying_price,
+        "avg_daily_volume": decision.avg_daily_volume,
+        "option_open_interest": decision.option_open_interest,
+        "option_volume": decision.option_volume,
+        "bid": decision.bid,
+        "ask": decision.ask,
+        "option_quote_age_seconds": decision.option_quote_age_seconds,
+        "underlying_quote_age_seconds": decision.underlying_quote_age_seconds,
         "close": decision.close,
         "dma20": decision.dma20,
         "dma50": decision.dma50,
