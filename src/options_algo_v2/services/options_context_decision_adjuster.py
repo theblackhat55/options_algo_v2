@@ -103,7 +103,7 @@ def _build_adjustment(
             score_delta += 1.0
             advisory_reasons.append("regime_call_heavy_supportive")
         elif direction == "bearish":
-            score_delta -= 2.0
+            score_delta -= 1.0
             reasons.append("regime_call_heavy")
     elif regime in {"broad_liquid", "balanced_liquid"}:
         score_delta += 1.0
@@ -168,7 +168,7 @@ def _build_adjustment(
                 score_delta += 1.0
                 advisory_reasons.append("pcr_volume_put_heavy_supportive")
             elif pcr_volume < 0.35:
-                score_delta -= 2.0
+                score_delta -= 1.0
                 reasons.append("pcr_volume_extreme_call_heavy")
 
     # Skew
