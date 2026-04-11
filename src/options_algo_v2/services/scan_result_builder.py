@@ -12,9 +12,16 @@ from options_algo_v2.services.databento_runtime_info import (
     build_databento_runtime_info,
 )
 from options_algo_v2.services.decision_diagnostics import (
+    count_blocking_reasons,
+    count_directional_blockers,
+    count_directional_states,
+    count_non_actionable_directional_states,
     count_rejection_reasons,
     count_signal_states,
+    count_soft_penalty_reasons,
     count_strategy_types,
+    list_non_actionable_directional_symbols,
+    list_passed_with_soft_penalties_symbols,
 )
 from options_algo_v2.services.decision_serializer import serialize_candidate_decision
 from options_algo_v2.services.feature_source_diagnostics import (
@@ -368,6 +375,10 @@ def build_scan_result(
         else {}
     )
 
+    passed_with_soft_penalties_symbols = list_passed_with_soft_penalties_symbols(
+        serialized_decisions
+    )
+
     runtime_metadata: dict[str, object] = {
         "feature_debug_by_symbol": _build_feature_debug_by_symbol(feature_sources),
         "decision_trace_by_symbol": _build_decision_trace_by_symbol(serialized_decisions),
@@ -439,6 +450,21 @@ def build_scan_result(
         "trade_idea_counts_by_strategy_family": (
             count_trade_ideas_by_strategy_family(trade_ideas)
         ),
+        "directional_state_counts": count_directional_states(decisions),
+        "non_actionable_directional_state_counts": (
+            count_non_actionable_directional_states(decisions)
+        ),
+        "non_actionable_directional_state_count": sum(
+            count_non_actionable_directional_states(decisions).values()
+        ),
+        "non_actionable_directional_symbols": (
+            list_non_actionable_directional_symbols(decisions)
+        ),
+        "directional_blocker_counts": count_directional_blockers(serialized_decisions),
+        "blocking_reason_counts": count_blocking_reasons(serialized_decisions),
+        "soft_penalty_reason_counts": count_soft_penalty_reasons(serialized_decisions),
+        "passed_with_soft_penalties_symbols": passed_with_soft_penalties_symbols,
+        "passed_with_soft_penalties_count": len(passed_with_soft_penalties_symbols),
         "top_trade_summary_rows": top_trade_summary_rows,
     }
 
