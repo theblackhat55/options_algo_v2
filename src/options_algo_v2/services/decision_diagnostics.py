@@ -304,3 +304,79 @@ def near_threshold_failure_decisions(
 
     rows.sort(key=lambda x: (float(x.get("score_gap", 999.0)), -float(x.get("final_score", 0.0))))
     return rows[:limit]
+
+
+def classify_failure_archetype(item: dict[str, object]) -> str:
+    if bool(item.get("final_passed")):
+        return "passed"
+
+    blocking = [str(x) for x in list(item.get("blocking_reasons") or [])]
+    soft = [str(x) for x in list(item.get("soft_penalty_reasons") or [])]
+
+    if "directional state is not actionable" in blocking:
+        return "directional_non_actionable"
+    if "option volume below minimum" in blocking:
+        return "liquidity_blocked"
+    if "strategy not permitted in current regime" in blocking:
+        return "strategy_regime_mismatch"
+    if blocking == ["candidate score below minimum threshold"] and not soft:
+        return "score_only_failure"
+    if "candidate score below minimum threshold" in blocking and soft:
+        return "score_plus_soft_penalties"
+    return "other_blocked"
+
+
+def count_failure_archetypes(serialized_decisions) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in serialized_decisions:
+        archetype = classify_failure_archetype(item)
+        counts[archetype] = counts.get(archetype, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def failure_archetype_by_symbol(serialized_decisions) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for item in serialized_decisions:
+        symbol = item.get("symbol")
+        if isinstance(symbol, str) and symbol:
+            result[symbol] = classify_failure_archetype(item)
+    return dict(sorted(result.items()))
+
+
+def failure_archetype_review_rows(
+    serialized_decisions,
+    *,
+    archetype: str,
+    limit: int = 5,
+) -> list[dict[str, object]]:
+    rows = [
+        item
+        for item in serialized_decisions
+        if classify_failure_archetype(item) == archetype
+    ]
+    rows.sort(key=lambda x: float(x.get("final_score", 0.0)), reverse=True)
+    return [_review_row(item) for item in rows[:limit]]
+
+
+def failure_archetype_review_slices(
+    serialized_decisions,
+    *,
+    limit: int = 5,
+) -> dict[str, list[dict[str, object]]]:
+    archetypes = [
+        "directional_non_actionable",
+        "liquidity_blocked",
+        "score_plus_soft_penalties",
+        "strategy_regime_mismatch",
+        "score_only_failure",
+        "other_blocked",
+        "passed",
+    ]
+    return {
+        archetype: failure_archetype_review_rows(
+            serialized_decisions,
+            archetype=archetype,
+            limit=limit,
+        )
+        for archetype in archetypes
+    }
