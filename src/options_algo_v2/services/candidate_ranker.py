@@ -40,7 +40,7 @@ def score_candidate(
     if adx is not None:
         # ADX: 18 = minimum trend, 40+ = very strong.
         # Scale [18, 40] -> [0, 1]
-        directional_score = 25.0 * _scale(adx, 18.0, 40.0)
+        directional_score = 25.0 * _scale(adx, 16.0, 40.0)
     else:
         directional_score = 25.0 if directional_fit else 0.0
 
@@ -88,7 +88,7 @@ def score_candidate_breakdown(
         regime_score = 20.0 if regime_fit else 0.0
 
     if adx is not None:
-        directional_score = 25.0 * _scale(adx, 18.0, 40.0)
+        directional_score = 25.0 * _scale(adx, 16.0, 40.0)
     else:
         directional_score = 25.0 if directional_fit else 0.0
 
