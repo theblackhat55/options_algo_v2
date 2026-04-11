@@ -293,7 +293,25 @@ def apply_options_context_to_decisions(
             if "candidate score below minimum threshold" not in rejection_reasons:
                 rejection_reasons.append("candidate score below minimum threshold")
 
-        final_passed = score_meets_threshold and not blocking_reasons
+        only_score_blocking = len(blocking_reasons) == 0
+        no_soft_penalty_reasons = len(extra_reasons) == 0
+        borderline_score_pass = (
+            not score_meets_threshold
+            and new_final_score >= (float(decision.min_score_required) - 2.0)
+            and only_score_blocking
+            and no_soft_penalty_reasons
+        )
+
+        if borderline_score_pass:
+            rejection_reasons = [
+                reason
+                for reason in rejection_reasons
+                if reason != "candidate score below minimum threshold"
+            ]
+
+        final_passed = (score_meets_threshold or borderline_score_pass) and not (
+            blocking_reasons - {"candidate score below minimum threshold"}
+        )
 
         adjusted_decision = replace(
             decision,
