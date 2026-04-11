@@ -21,7 +21,6 @@ def score_candidate(
     iv_ratio: float | None = None,
     breadth_distance: float | None = None,
     momentum_score: float | None = None,
-    directional_structure_score: float | None = None,
 ) -> float:
     """Score a candidate using a blend of boolean and continuous inputs.
 
@@ -39,11 +38,9 @@ def score_candidate(
 
     # --- Directional (25 pts max) ---
     if adx is not None:
-        # ADX: 16 = minimum trend, 40+ = very strong.
-        # Use up to 20 pts from ADX and up to 5 pts from structure alignment.
-        directional_score = 20.0 * _scale(adx, 16.0, 40.0)
-        if directional_structure_score is not None:
-            directional_score += 5.0 * max(0.0, min(1.0, directional_structure_score))
+        # ADX: 18 = minimum trend, 40+ = very strong.
+        # Scale [18, 40] -> [0, 1]
+        directional_score = 25.0 * _scale(adx, 18.0, 40.0)
     else:
         directional_score = 25.0 if directional_fit else 0.0
 
