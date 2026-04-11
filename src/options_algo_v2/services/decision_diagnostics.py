@@ -413,3 +413,51 @@ def directional_failure_summary(serialized_decisions) -> dict[str, object]:
         "directional_state_counts": dict(sorted(state_counts.items())),
         "directional_blocker_counts": dict(sorted(blocker_counts.items())),
     }
+
+
+def score_plus_soft_penalty_summary(serialized_decisions) -> dict[str, object]:
+    rows = [
+        item
+        for item in serialized_decisions
+        if classify_failure_archetype(item) == "score_plus_soft_penalties"
+    ]
+    rows.sort(key=lambda x: float(x.get("final_score", 0.0)), reverse=True)
+
+    soft_counts: dict[str, int] = {}
+    symbols: list[str] = []
+
+    summary_rows: list[dict[str, object]] = []
+    for item in rows:
+        symbol = item.get("symbol")
+        if isinstance(symbol, str) and symbol:
+            symbols.append(symbol)
+
+        soft = [str(x) for x in list(item.get("soft_penalty_reasons") or [])]
+        for reason in soft:
+            soft_counts[reason] = soft_counts.get(reason, 0) + 1
+
+        final_score = item.get("final_score")
+        min_score_required = item.get("min_score_required")
+        score_gap = None
+        if isinstance(final_score, (int, float)) and isinstance(min_score_required, (int, float)):
+            score_gap = round(float(min_score_required) - float(final_score), 3)
+
+        summary_rows.append(
+            {
+                "symbol": item.get("symbol"),
+                "final_score": item.get("final_score"),
+                "min_score_required": item.get("min_score_required"),
+                "score_gap": score_gap,
+                "strategy_type": item.get("strategy_type"),
+                "directional_state": item.get("directional_state"),
+                "blocking_reasons": list(item.get("blocking_reasons") or []),
+                "soft_penalty_reasons": soft,
+            }
+        )
+
+    return {
+        "count": len(rows),
+        "symbols": symbols,
+        "soft_penalty_counts": dict(sorted(soft_counts.items())),
+        "rows": summary_rows,
+    }

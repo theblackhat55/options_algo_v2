@@ -33,6 +33,7 @@ from options_algo_v2.services.decision_diagnostics import (
     lowest_score_passing_decision,
     near_threshold_failure_decisions,
     passed_with_soft_penalties_decisions,
+    score_plus_soft_penalty_summary,
     top_passed_decisions,
 )
 from options_algo_v2.services.decision_serializer import serialize_candidate_decision
@@ -482,6 +483,9 @@ def build_scan_result(
             serialized_decisions
         ),
         "directional_failure_summary": directional_failure_summary(serialized_decisions),
+        "score_plus_soft_penalty_summary": score_plus_soft_penalty_summary(
+            serialized_decisions
+        ),
         "passed_with_soft_penalties_symbols": passed_with_soft_penalties_symbols,
         "passed_with_soft_penalties_count": len(passed_with_soft_penalties_symbols),
         "near_threshold_failures": near_threshold_failures,
