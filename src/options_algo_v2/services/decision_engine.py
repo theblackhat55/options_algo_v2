@@ -69,6 +69,23 @@ def evaluate_candidate_decision(
         breadth_distance = abs(float(evaluation_input.market_breadth_pct_above_20dma) - 50.0)
         momentum_score = 1.0 if evaluation_input.expected_move_fit else 0.0
 
+        bullish_structure_checks = [
+            evaluation_input.close > evaluation_input.dma20,
+            evaluation_input.close > evaluation_input.dma50,
+            evaluation_input.dma20 > evaluation_input.dma50,
+        ]
+        bearish_structure_checks = [
+            evaluation_input.close < evaluation_input.dma20,
+            evaluation_input.close < evaluation_input.dma50,
+            evaluation_input.dma20 < evaluation_input.dma50,
+        ]
+
+        directional_structure_score = 0.0
+        if str(evaluation_input.directional_state).startswith("BULLISH"):
+            directional_structure_score = sum(1.0 for ok in bullish_structure_checks if ok) / 3.0
+        elif str(evaluation_input.directional_state).startswith("BEARISH"):
+            directional_structure_score = sum(1.0 for ok in bearish_structure_checks if ok) / 3.0
+
         final_score = score_candidate(
             regime_fit=True,
             directional_fit=True,
@@ -80,6 +97,7 @@ def evaluate_candidate_decision(
             iv_ratio=float(evaluation_input.iv_hv_ratio),
             breadth_distance=breadth_distance,
             momentum_score=momentum_score,
+            directional_structure_score=directional_structure_score,
         )
 
     rejection_reasons: list[str] = []
@@ -127,6 +145,14 @@ def evaluate_candidate_decision(
         dma50=evaluation_input.dma50,
         atr20=evaluation_input.atr20,
         adx14=evaluation_input.adx14,
+        underlying_price=evaluation_input.underlying_price,
+        avg_daily_volume=evaluation_input.avg_daily_volume,
+        option_open_interest=evaluation_input.option_open_interest,
+        option_volume=evaluation_input.option_volume,
+        bid=evaluation_input.bid,
+        ask=evaluation_input.ask,
+        option_quote_age_seconds=evaluation_input.option_quote_age_seconds,
+        underlying_quote_age_seconds=evaluation_input.underlying_quote_age_seconds,
         iv_rank=evaluation_input.iv_rank,
         iv_hv_ratio=evaluation_input.iv_hv_ratio,
         market_breadth_pct_above_20dma=evaluation_input.market_breadth_pct_above_20dma,
