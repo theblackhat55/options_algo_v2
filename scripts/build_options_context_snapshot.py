@@ -6,6 +6,9 @@ import sys
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
+from options_algo_v2.services.historical_row_provider_factory import (
+    build_historical_row_provider,
+)
 from options_algo_v2.services.options_chain_provider_factory import (
     build_options_chain_provider,
     get_options_chain_provider_name,
@@ -63,6 +66,64 @@ def _build_as_of_utc(end_date: str | None) -> str:
     return f"{resolved_end_date}T23:59:59Z"
 
 
+def _extract_spot_price_from_row(row: dict[str, object]) -> float | None:
+    for key in ("close", "spot_price", "underlying_price", "price", "last"):
+        value = _to_float(row.get(key))
+        if value is not None and value > 0:
+            return value
+    return None
+
+
+def _latest_close_from_bar_rows(bar_rows: list[dict[str, object]]) -> float | None:
+    if not bar_rows:
+        return None
+
+    latest_row = None
+    latest_ts = None
+    for row in bar_rows:
+        ts = row.get("ts_event")
+        if not isinstance(ts, str) or not ts:
+            continue
+        if latest_ts is None or ts > latest_ts:
+            latest_ts = ts
+            latest_row = row
+
+    if not isinstance(latest_row, dict):
+        return None
+
+    return _to_float(latest_row.get("close"))
+
+
+def _resolve_spot_price(
+    *,
+    base_row: dict[str, object],
+    symbol: str,
+    row_provider: object,
+    resolved_end_date: str | None,
+) -> tuple[float | None, str]:
+    direct_spot = _extract_spot_price_from_row(base_row)
+    if direct_spot is not None and direct_spot > 0:
+        return direct_spot, "watchlist"
+
+    get_bar_rows = getattr(row_provider, "get_bar_rows", None)
+    if callable(get_bar_rows):
+        try:
+            bar_rows = get_bar_rows(
+                symbol=symbol,
+                dataset="XNAS.ITCH",
+                schema="ohlcv-1d",
+                end_date=resolved_end_date,
+            )
+        except Exception:
+            bar_rows = []
+
+        fallback_spot = _latest_close_from_bar_rows(bar_rows)
+        if fallback_spot is not None and fallback_spot > 0:
+            return fallback_spot, "historical_rows"
+
+    return None, "missing"
+
+
 def build_options_context_snapshot(
     watchlist_path: str,
     db_path: str = "data/cache/market_history_watchlist60.db",
@@ -74,15 +135,26 @@ def build_options_context_snapshot(
     provider = build_options_chain_provider()
     provider_name = get_options_chain_provider_name()
     provider_source = get_options_chain_provider_source()
+    historical_row_provider = build_historical_row_provider()
 
     as_of_utc = _build_as_of_utc(end_date)
+    resolved_end_date = _resolve_requested_end_date_for_context(end_date)
 
     snapshots = []
     low_confidence_symbols: list[str] = []
+    spot_price_source_counts: dict[str, int] = {}
 
     for base_row in base_rows:
         symbol = str(base_row["symbol"])
-        spot_price = _to_float(base_row.get("close"))
+        spot_price, spot_price_source = _resolve_spot_price(
+            base_row=base_row,
+            symbol=symbol,
+            row_provider=historical_row_provider,
+            resolved_end_date=resolved_end_date,
+        )
+        spot_price_source_counts[spot_price_source] = (
+            spot_price_source_counts.get(spot_price_source, 0) + 1
+        )
 
         chain = provider.get_chain(symbol)
         snapshot = compute_options_context_snapshot(
@@ -106,9 +178,10 @@ def build_options_context_snapshot(
     print(f"options_chain_provider={provider_name}")
     print(f"options_chain_provider_source={provider_source}")
     print(f"as_of_utc={as_of_utc}")
-    print(f"resolved_end_date={_resolve_requested_end_date_for_context(end_date)}")
+    print(f"resolved_end_date={resolved_end_date}")
     print(f"row_count={len(snapshots)}")
     print(f"sqlite_db_path={sqlite_db_path}")
+    print(f"spot_price_source_counts={spot_price_source_counts}")
     print(f"low_confidence_symbols={low_confidence_symbols}")
 
     return str(sqlite_db_path)

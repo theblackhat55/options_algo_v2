@@ -33,6 +33,8 @@ def summarize_options_context_coverage(
     missing = [s for s in normalized if s not in context_index]
 
     regime_counts: dict[str, int] = {}
+    confidence_reason_counts: dict[str, int] = {}
+    missing_field_counts: dict[str, int] = {}
     low_confidence_symbols: list[str] = []
     expected_move_leaders: list[dict[str, Any]] = []
     skew_leaders: list[dict[str, Any]] = []
@@ -48,6 +50,20 @@ def summarize_options_context_coverage(
         confidence = _to_float(row.get("confidence_score")) or 0.0
         if confidence < 0.75:
             low_confidence_symbols.append(symbol)
+
+        confidence_reasons = row.get("confidence_reasons")
+        if isinstance(confidence_reasons, list):
+            for reason in confidence_reasons:
+                confidence_reason_counts[str(reason)] = (
+                    confidence_reason_counts.get(str(reason), 0) + 1
+                )
+
+        missing_fields = row.get("missing_fields")
+        if isinstance(missing_fields, list):
+            for field in missing_fields:
+                missing_field_counts[str(field)] = (
+                    missing_field_counts.get(str(field), 0) + 1
+                )
 
         expected_move = _to_float(row.get("expected_move_1d_pct"))
         if expected_move is not None:
@@ -119,13 +135,27 @@ def summarize_options_context_coverage(
         else:
             fresh_symbols.append(symbol)
 
+    loaded_future_snapshot = bool(
+        resolved_end_date is not None
+        and isinstance(latest_as_of_date, str)
+        and latest_as_of_date > resolved_end_date
+    )
+    point_in_time_safe = not loaded_future_snapshot
+
     return {
         "options_context_symbol_count": len(normalized),
         "options_context_matched_count": len(matched),
         "options_context_missing_count": len(missing),
         "options_context_missing_symbols": missing[:20],
         "options_context_regime_counts": regime_counts,
+        "options_context_low_confidence_count": len(low_confidence_symbols),
         "options_context_low_confidence_symbols": low_confidence_symbols[:20],
+        "options_context_confidence_reason_counts": dict(
+            sorted(confidence_reason_counts.items())
+        ),
+        "options_context_missing_field_counts": dict(
+            sorted(missing_field_counts.items())
+        ),
         "options_context_top_expected_move_symbols": expected_move_leaders,
         "options_context_top_skew_symbols": skew_leaders,
         "options_context_top_gamma_flip_risk_symbols": gamma_flip_risk_leaders,
@@ -135,6 +165,9 @@ def summarize_options_context_coverage(
         "options_context_latest_as_of_utc": latest_as_of_utc,
         "options_context_source_provider_counts": source_provider_counts or {},
         "options_context_resolved_end_date": resolved_end_date,
+        "options_context_requested_max_as_of_date": resolved_end_date,
+        "options_context_point_in_time_safe": point_in_time_safe,
+        "options_context_loaded_future_snapshot": loaded_future_snapshot,
         "options_context_fresh_count": len(fresh_symbols),
         "options_context_stale_count": len(stale_symbols),
         "options_context_stale_symbols": stale_symbols[:20],

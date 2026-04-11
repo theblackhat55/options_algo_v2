@@ -15,6 +15,14 @@ class CandidateDecision:
     final_passed: bool
     final_score: float
     min_score_required: float
+    underlying_price: float | None = None
+    avg_daily_volume: float | None = None
+    option_open_interest: int | None = None
+    option_volume: int | None = None
+    bid: float | None = None
+    ask: float | None = None
+    option_quote_age_seconds: int | None = None
+    underlying_quote_age_seconds: int | None = None
     close: float | None = None
     dma20: float | None = None
     dma50: float | None = None
