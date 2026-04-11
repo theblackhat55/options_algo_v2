@@ -39,3 +39,4 @@ class CandidateDecision:
     extended_up: bool | None = None
     extended_down: bool | None = None
     rejection_reasons: list[str] = field(default_factory=list)
+    score_breakdown: dict[str, float] = field(default_factory=dict)

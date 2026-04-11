@@ -4,7 +4,7 @@ from options_algo_v2.config.rulebook_config import load_rulebook_configs
 from options_algo_v2.domain.decision import CandidateDecision
 from options_algo_v2.domain.enums import SignalState
 from options_algo_v2.domain.evaluation_input import CandidateEvaluationInput
-from options_algo_v2.services.candidate_ranker import score_candidate
+from options_algo_v2.services.candidate_ranker import score_candidate, score_candidate_breakdown
 from options_algo_v2.services.event_filter import passes_event_filter
 from options_algo_v2.services.extension_filter import passes_extension_filter
 from options_algo_v2.services.liquidity_filter import passes_liquidity_filter
@@ -65,9 +65,23 @@ def evaluate_candidate_decision(
     )
 
     final_score = 0.0
+    score_breakdown: dict[str, float] = {}
     if selector_passed:
         breadth_distance = abs(float(evaluation_input.market_breadth_pct_above_20dma) - 50.0)
         momentum_score = 1.0 if evaluation_input.expected_move_fit else 0.0
+
+        score_breakdown = score_candidate_breakdown(
+            regime_fit=True,
+            directional_fit=True,
+            iv_fit=True,
+            liquidity_fit=liquidity_result.passed,
+            expected_move_fit=evaluation_input.expected_move_fit,
+            is_extended=not extension_result.passed,
+            adx=float(evaluation_input.adx14),
+            iv_ratio=float(evaluation_input.iv_hv_ratio),
+            breadth_distance=breadth_distance,
+            momentum_score=momentum_score,
+        )
 
         final_score = score_candidate(
             regime_fit=True,
@@ -146,4 +160,5 @@ def evaluate_candidate_decision(
         extended_up=extended_up,
         extended_down=extended_down,
         rejection_reasons=rejection_reasons,
+        score_breakdown=score_breakdown,
     )

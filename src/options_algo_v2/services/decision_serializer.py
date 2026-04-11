@@ -178,6 +178,7 @@ def serialize_candidate_decision(
         "final_score": decision.final_score,
         "min_score_required": decision.min_score_required,
         "rejection_reasons": list(decision.rejection_reasons),
+        "score_breakdown": dict(decision.score_breakdown),
         "blocking_reasons": _blocking_reasons(decision),
         "soft_penalty_reasons": _soft_penalty_reasons(decision),
         "rationale": list(decision.candidate.rationale),
