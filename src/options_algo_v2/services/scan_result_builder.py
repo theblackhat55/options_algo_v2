@@ -17,11 +17,19 @@ from options_algo_v2.services.decision_diagnostics import (
     count_directional_states,
     count_non_actionable_directional_states,
     count_rejection_reasons,
+    count_score_gap_buckets,
     count_signal_states,
     count_soft_penalty_reasons,
     count_strategy_types,
+    highest_score_failed_decisions,
+    highest_score_failing_decision,
+    list_near_threshold_failures,
     list_non_actionable_directional_symbols,
     list_passed_with_soft_penalties_symbols,
+    lowest_score_passing_decision,
+    near_threshold_failure_decisions,
+    passed_with_soft_penalties_decisions,
+    top_passed_decisions,
 )
 from options_algo_v2.services.decision_serializer import serialize_candidate_decision
 from options_algo_v2.services.feature_source_diagnostics import (
@@ -378,6 +386,7 @@ def build_scan_result(
     passed_with_soft_penalties_symbols = list_passed_with_soft_penalties_symbols(
         serialized_decisions
     )
+    near_threshold_failures = list_near_threshold_failures(serialized_decisions)
 
     runtime_metadata: dict[str, object] = {
         "feature_debug_by_symbol": _build_feature_debug_by_symbol(feature_sources),
@@ -465,6 +474,22 @@ def build_scan_result(
         "soft_penalty_reason_counts": count_soft_penalty_reasons(serialized_decisions),
         "passed_with_soft_penalties_symbols": passed_with_soft_penalties_symbols,
         "passed_with_soft_penalties_count": len(passed_with_soft_penalties_symbols),
+        "near_threshold_failures": near_threshold_failures,
+        "near_threshold_failure_symbols": [
+            str(item.get("symbol", "unknown")) for item in near_threshold_failures
+        ],
+        "near_threshold_failure_count": len(near_threshold_failures),
+        "score_gap_bucket_counts": count_score_gap_buckets(serialized_decisions),
+        "highest_score_failing_decision": highest_score_failing_decision(serialized_decisions),
+        "lowest_score_passing_decision": lowest_score_passing_decision(serialized_decisions),
+        "top_passed_decisions": top_passed_decisions(serialized_decisions),
+        "highest_score_failed_decisions": highest_score_failed_decisions(serialized_decisions),
+        "passed_with_soft_penalties_decisions": passed_with_soft_penalties_decisions(
+            serialized_decisions
+        ),
+        "near_threshold_failure_decisions": near_threshold_failure_decisions(
+            serialized_decisions
+        ),
         "top_trade_summary_rows": top_trade_summary_rows,
     }
 
