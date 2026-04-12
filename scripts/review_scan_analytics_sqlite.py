@@ -98,7 +98,10 @@ def _load_symbol_rows_for_runs(
             options_context_borderline_score_pass,
             options_context_borderline_score_pass_tier_a,
             options_context_borderline_score_pass_tier_b,
-            options_context_borderline_rescue_tier
+            options_context_borderline_rescue_tier,
+            options_context_pre_context_score,
+            options_context_pre_context_score_gap,
+            options_context_effective_soft_penalties_json
         FROM scan_symbol_decisions
         WHERE run_id IN ({placeholders})
     """
@@ -185,6 +188,12 @@ def main() -> None:
                 "score_count": 0,
                 "gap_sum": 0.0,
                 "gap_count": 0,
+                "pre_context_score_sum": 0.0,
+                "pre_context_score_count": 0,
+                "pre_context_gap_sum": 0.0,
+                "pre_context_gap_count": 0,
+                "score_uplift_sum": 0.0,
+                "score_uplift_count": 0,
                 "blocking_reason_counts": Counter(),
                 "soft_penalty_reason_counts": Counter(),
             },
@@ -210,8 +219,34 @@ def main() -> None:
             entry["gap_sum"] += gap
             entry["gap_count"] += 1
 
+        pre_context_score = row.get("options_context_pre_context_score")
+        if pre_context_score is not None:
+            try:
+                pre_context_score_value = float(pre_context_score)
+                entry["pre_context_score_sum"] += pre_context_score_value
+                entry["pre_context_score_count"] += 1
+
+                final_score_value = row.get("final_score")
+                if final_score_value is not None:
+                    final_score_value = float(final_score_value)
+                    entry["score_uplift_sum"] += round(
+                        final_score_value - pre_context_score_value, 3
+                    )
+                    entry["score_uplift_count"] += 1
+            except (TypeError, ValueError):
+                pass
+
+        pre_context_gap = row.get("options_context_pre_context_score_gap")
+        if pre_context_gap is not None:
+            try:
+                entry["pre_context_gap_sum"] += float(pre_context_gap)
+                entry["pre_context_gap_count"] += 1
+            except (TypeError, ValueError):
+                pass
+
         blocking = _json_list(row.get("blocking_reasons_json"))
         soft = _json_list(row.get("soft_penalty_reasons_json"))
+        effective_soft = _json_list(row.get("options_context_effective_soft_penalties_json"))
         borderline_score_pass = bool(row.get("options_context_borderline_score_pass"))
         borderline_score_pass_tier_a = bool(row.get("options_context_borderline_score_pass_tier_a"))
         borderline_score_pass_tier_b = bool(row.get("options_context_borderline_score_pass_tier_b"))
@@ -222,6 +257,8 @@ def main() -> None:
 
         blocker_totals.update(str(x) for x in blocking)
         soft_penalty_totals.update(str(x) for x in soft)
+        if effective_soft:
+            soft_penalty_totals.update(str(x) for x in effective_soft)
 
         synthetic_row = {
             "final_passed": passed,
@@ -272,6 +309,21 @@ def main() -> None:
             if entry["gap_count"]
             else None
         )
+        avg_pre_context_score = (
+            round(float(entry["pre_context_score_sum"]) / int(entry["pre_context_score_count"]), 3)
+            if entry["pre_context_score_count"]
+            else None
+        )
+        avg_pre_context_gap = (
+            round(float(entry["pre_context_gap_sum"]) / int(entry["pre_context_gap_count"]), 3)
+            if entry["pre_context_gap_count"]
+            else None
+        )
+        avg_score_uplift = (
+            round(float(entry["score_uplift_sum"]) / int(entry["score_uplift_count"]), 3)
+            if entry["score_uplift_count"]
+            else None
+        )
         per_symbol_rows.append(
             {
                 "symbol": sym,
@@ -280,6 +332,9 @@ def main() -> None:
                 "fails": entry["fails"],
                 "avg_final_score": avg_score,
                 "avg_score_gap": avg_gap,
+                "avg_pre_context_score": avg_pre_context_score,
+                "avg_pre_context_gap": avg_pre_context_gap,
+                "avg_score_uplift": avg_score_uplift,
                 "blocking_reason_counts": _sorted_counter_dict(entry["blocking_reason_counts"]),
                 "soft_penalty_reason_counts": _sorted_counter_dict(entry["soft_penalty_reason_counts"]),
             }
