@@ -393,6 +393,8 @@ def apply_options_context_to_decisions(
             "applied_reason_codes": extra_reasons,
             "advisory_reason_codes": advisory_reasons,
             "effective_soft_penalties": effective_soft_penalties,
+            "pre_context_score": round(pre_context_score, 3),
+            "pre_context_score_gap": round(pre_context_score_gap, 3),
             "only_score_blocking": only_score_blocking,
             "soft_penalties_allowlisted": soft_penalties_allowlisted,
             "soft_penalty_count_ok": soft_penalty_count_ok,
