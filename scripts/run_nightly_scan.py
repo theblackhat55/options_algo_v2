@@ -58,6 +58,7 @@ from options_algo_v2.services.runtime_mode import get_runtime_mode
 from options_algo_v2.services.scan_artifact_orchestrator import (
     build_and_write_scan_artifact,
 )
+from options_algo_v2.services.scan_result_writer import write_scan_result
 from options_algo_v2.services.universe_loader import load_universe_symbols
 
 
@@ -1158,6 +1159,10 @@ def run_nightly_scan(
             "quote_quality_by_symbol": quote_quality_by_symbol,
             "aggregate_quote_quality_counts": aggregate_quote_quality_counts,
             "liquidity_debug_by_symbol": liquidity_debug_by_symbol,
+            "sqlite_persistence_enabled": True,
+            "history_db_path": str(history_path),
+            "persisted_options_chain_summary_count": persisted_options_chain_summary_count,
+            "persisted_options_contract_quote_count": persisted_options_contract_quote_count,
             "options_context_source_watchlist": options_context_payload.get("source_watchlist"),
             "options_context_generated_at_utc": options_context_payload.get("generated_at_utc"),
             "options_context_run_id": options_context_payload.get("run_id"),
@@ -1191,7 +1196,13 @@ def run_nightly_scan(
         db_path=history_path,
     )
 
-    output_path = artifact_result.output_path
+    artifact_result.scan_result.runtime_metadata[
+        "persisted_trade_candidate_input_count"
+    ] = persisted_trade_candidate_input_count
+    output_path = write_scan_result(
+        scan_result=artifact_result.scan_result,
+        base_dir=artifact_result.output_path.parent,
+    )
     artifact = output_path.read_text()
 
     payload = json.loads(artifact)
