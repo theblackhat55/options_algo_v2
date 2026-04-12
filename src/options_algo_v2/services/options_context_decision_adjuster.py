@@ -305,8 +305,13 @@ def apply_options_context_to_decisions(
             "pcr_volume_extreme_call_heavy",
         }
         max_allowed_borderline_soft_penalties = 2
-        tier_b_allowed_soft_penalties = {"weak_iv_coverage"}
-        tier_b_max_soft_penalties = 1
+
+        tier_b_allowed_soft_penalties = {
+            "weak_iv_coverage",
+            "weak_bid_ask_coverage",
+            "weak_delta_coverage",
+        }
+        tier_b_max_soft_penalties = 3
 
         only_score_blocking = (
             blocking_reasons_with_score == {"candidate score below minimum threshold"}
@@ -326,6 +331,9 @@ def apply_options_context_to_decisions(
             len(effective_soft_penalties) <= max_allowed_borderline_soft_penalties
         )
 
+        pre_context_score = float(decision.final_score)
+        pre_context_score_gap = float(decision.min_score_required) - pre_context_score
+
         borderline_score_pass_tier_a = (
             (not score_meets_threshold)
             and new_final_score >= 68.0
@@ -337,9 +345,10 @@ def apply_options_context_to_decisions(
 
         borderline_score_pass_tier_b = (
             (not score_meets_threshold)
-            and 67.0 <= new_final_score < 68.0
-            and score_gap <= 3.0
+            and 67.0 <= pre_context_score < 68.0
+            and pre_context_score_gap <= 3.0
             and only_score_blocking
+            and (not hard_reject)
             and set(effective_soft_penalties).issubset(tier_b_allowed_soft_penalties)
             and len(effective_soft_penalties) <= tier_b_max_soft_penalties
         )
