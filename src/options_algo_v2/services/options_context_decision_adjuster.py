@@ -344,7 +344,8 @@ def apply_options_context_to_decisions(
         )
 
         borderline_score_pass_tier_b = (
-            (not score_meets_threshold)
+            (not borderline_score_pass_tier_a)
+            and (not score_meets_threshold)
             and 67.0 <= pre_context_score < 68.0
             and pre_context_score_gap <= 3.0
             and only_score_blocking
