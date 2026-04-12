@@ -17,8 +17,8 @@ All early foundation phases are complete. The platform runs a watchlist-driven p
 - Explainable scan artifacts with per-symbol feature debug and decision trace
 - Paper-live daily run flow with JSONL/CSV validation logging
 - Review scripts and leaderboard tooling
-- Strict-live blocking for placeholder inputs
-- 280 tests passing
+- Strict-live blocking for placeholder or degraded inputs
+- Paper-live + SQLite analytics validation loop operational
 
 ---
 
@@ -150,7 +150,6 @@ set -a; source .env; set +a
 PYTHONPATH=src python scripts/run_paper_live_daily.py \
   --watchlist data/watchlists/<filtered_watchlist>.json
 
-PYTHONPATH=src python scripts/review_paper_live_logs.py --last-runs 5
+python3 scripts/review_scan_analytics_sqlite.py --limit-runs 20 --symbols BAC NFLX CRM
 
-PYTHONPATH=src python scripts/paper_live_symbol_leaderboard.py --last-runs 5
 ```

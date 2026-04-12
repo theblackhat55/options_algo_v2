@@ -94,8 +94,8 @@ The pipeline runs left-to-right in this order:
 - `scripts/run_trade_ideas.py` — scan + trade ideas
 - `scripts/inspect_scan_debug.py` — inspect scan artifacts
 - `scripts/inspect_scan_result.py` — inspect scan output
-- `scripts/review_paper_live_logs.py` — JSONL/CSV review path
-- `scripts/paper_live_symbol_leaderboard.py` — symbol frequency review path
+- `scripts/review_paper_live_logs.py` — legacy JSONL/CSV review path
+- `scripts/paper_live_symbol_leaderboard.py` — legacy symbol-frequency review path
 
 ### Output directories
 - `data/scan_results/` — scan artifacts
