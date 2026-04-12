@@ -8,7 +8,13 @@ from run_nightly_scan import run_nightly_scan
 
 from options_algo_v2.services.paper_live_logger import (
     append_paper_live_logs,
+    build_run_summary_row,
+    build_symbol_rows,
     default_paper_live_log_paths,
+)
+from options_algo_v2.services.scan_analytics_store import (
+    upsert_scan_run_summary_rows,
+    upsert_scan_symbol_decisions,
 )
 
 
@@ -50,11 +56,20 @@ def main() -> int:
     paths = default_paper_live_log_paths(args.validation_dir)
     append_paper_live_logs(payload=payload, paths=paths)
 
+    persisted_scan_run_summary_count = upsert_scan_run_summary_rows(
+        rows=[build_run_summary_row(payload)],
+    )
+    persisted_scan_symbol_decision_count = upsert_scan_symbol_decisions(
+        rows=build_symbol_rows(payload),
+    )
+
     print("paper_live_log_paths:")
     print(f"  run_jsonl={paths.run_jsonl}")
     print(f"  symbol_jsonl={paths.symbol_jsonl}")
     print(f"  run_csv={paths.run_csv}")
     print(f"  logged_run_id={payload.get('run_id')}")
+    print(f"  persisted_scan_run_summary_count={persisted_scan_run_summary_count}")
+    print(f"  persisted_scan_symbol_decision_count={persisted_scan_symbol_decision_count}")
     return 0
 
 
