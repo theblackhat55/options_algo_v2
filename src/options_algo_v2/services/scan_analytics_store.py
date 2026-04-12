@@ -56,6 +56,18 @@ def _ensure_scan_symbol_decisions_columns(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE scan_symbol_decisions ADD COLUMN options_context_borderline_rescue_tier TEXT"
         )
+    if "options_context_pre_context_score" not in existing:
+        conn.execute(
+            "ALTER TABLE scan_symbol_decisions ADD COLUMN options_context_pre_context_score REAL"
+        )
+    if "options_context_pre_context_score_gap" not in existing:
+        conn.execute(
+            "ALTER TABLE scan_symbol_decisions ADD COLUMN options_context_pre_context_score_gap REAL"
+        )
+    if "options_context_effective_soft_penalties_json" not in existing:
+        conn.execute(
+            "ALTER TABLE scan_symbol_decisions ADD COLUMN options_context_effective_soft_penalties_json TEXT"
+        )
 
 
 def init_scan_analytics_store(
@@ -164,6 +176,9 @@ def init_scan_analytics_store(
                 options_context_borderline_score_pass_tier_a INTEGER,
                 options_context_borderline_score_pass_tier_b INTEGER,
                 options_context_borderline_rescue_tier TEXT,
+                options_context_pre_context_score REAL,
+                options_context_pre_context_score_gap REAL,
+                options_context_effective_soft_penalties_json TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 PRIMARY KEY (run_id, symbol)
@@ -378,6 +393,9 @@ def upsert_scan_symbol_decisions(
                 int(bool(row.get("options_context_borderline_score_pass_tier_a"))) if row.get("options_context_borderline_score_pass_tier_a") is not None else None,
                 int(bool(row.get("options_context_borderline_score_pass_tier_b"))) if row.get("options_context_borderline_score_pass_tier_b") is not None else None,
                 row.get("options_context_borderline_rescue_tier"),
+                row.get("options_context_pre_context_score"),
+                row.get("options_context_pre_context_score_gap"),
+                json.dumps(row.get("options_context_effective_soft_penalties", [])),
                 now,
                 now,
             )
@@ -410,6 +428,8 @@ def upsert_scan_symbol_decisions(
                 options_context_final_score_after_context, options_context_final_passed_after_context,
                 options_context_borderline_score_pass, options_context_borderline_score_pass_tier_a,
                 options_context_borderline_score_pass_tier_b, options_context_borderline_rescue_tier,
+                options_context_pre_context_score, options_context_pre_context_score_gap,
+                options_context_effective_soft_penalties_json,
                 created_at, updated_at
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -475,6 +495,9 @@ def upsert_scan_symbol_decisions(
                 options_context_borderline_score_pass_tier_a=excluded.options_context_borderline_score_pass_tier_a,
                 options_context_borderline_score_pass_tier_b=excluded.options_context_borderline_score_pass_tier_b,
                 options_context_borderline_rescue_tier=excluded.options_context_borderline_rescue_tier,
+                options_context_pre_context_score=excluded.options_context_pre_context_score,
+                options_context_pre_context_score_gap=excluded.options_context_pre_context_score_gap,
+                options_context_effective_soft_penalties_json=excluded.options_context_effective_soft_penalties_json,
                 updated_at=excluded.updated_at
             """,
             payload,

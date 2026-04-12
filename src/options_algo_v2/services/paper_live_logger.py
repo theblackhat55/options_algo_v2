@@ -302,6 +302,15 @@ def build_symbol_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
             "options_context_final_passed_after_context": options_context_decision_debug_row.get(
                 "final_passed_after_context"
             ),
+            "options_context_pre_context_score": options_context_decision_debug_row.get(
+                "pre_context_score"
+            ),
+            "options_context_pre_context_score_gap": options_context_decision_debug_row.get(
+                "pre_context_score_gap"
+            ),
+            "options_context_effective_soft_penalties": options_context_decision_debug_row.get(
+                "effective_soft_penalties", []
+            ),
             "options_context_borderline_score_pass": borderline_score_pass,
             "options_context_borderline_score_pass_tier_a": borderline_score_pass_tier_a,
             "options_context_borderline_score_pass_tier_b": borderline_score_pass_tier_b,
