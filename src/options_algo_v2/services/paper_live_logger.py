@@ -185,6 +185,8 @@ def build_symbol_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
             "strategy_type": decision.get("strategy_type"),
             "final_score": decision.get("final_score"),
             "min_score_required": decision.get("min_score_required"),
+            "blocking_reasons": decision.get("blocking_reasons", []),
+            "soft_penalty_reasons": decision.get("soft_penalty_reasons", []),
             "rejection_reasons": decision.get("rejection_reasons", []),
             "rationale": decision.get("rationale", []),
             "close": decision.get("close"),

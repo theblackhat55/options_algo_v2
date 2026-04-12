@@ -31,6 +31,17 @@ def get_connection(db_path: Path = DEFAULT_SCAN_ANALYTICS_DB_PATH):
         conn.close()
 
 
+def _ensure_scan_symbol_decisions_columns(conn: sqlite3.Connection) -> None:
+    existing = {
+        str(row[1])
+        for row in conn.execute("PRAGMA table_info(scan_symbol_decisions)").fetchall()
+    }
+    if "blocking_reasons_json" not in existing:
+        conn.execute("ALTER TABLE scan_symbol_decisions ADD COLUMN blocking_reasons_json TEXT")
+    if "soft_penalty_reasons_json" not in existing:
+        conn.execute("ALTER TABLE scan_symbol_decisions ADD COLUMN soft_penalty_reasons_json TEXT")
+
+
 def init_scan_analytics_store(
     db_path: Path = DEFAULT_SCAN_ANALYTICS_DB_PATH,
 ) -> None:
@@ -87,6 +98,8 @@ def init_scan_analytics_store(
                 strategy_type TEXT,
                 final_score REAL,
                 min_score_required REAL,
+                blocking_reasons_json TEXT,
+                soft_penalty_reasons_json TEXT,
                 rejection_reasons_json TEXT,
                 rationale_json TEXT,
                 close REAL,
@@ -149,6 +162,7 @@ def init_scan_analytics_store(
             ON scan_symbol_decisions (as_of_date);
             """
         )
+        _ensure_scan_symbol_decisions_columns(conn)
 
 
 def upsert_scan_run_summary_rows(
@@ -294,6 +308,8 @@ def upsert_scan_symbol_decisions(
                 row.get("strategy_type"),
                 row.get("final_score"),
                 row.get("min_score_required"),
+                json.dumps(row.get("blocking_reasons", []), sort_keys=True),
+                json.dumps(row.get("soft_penalty_reasons", []), sort_keys=True),
                 json.dumps(row.get("rejection_reasons", []), sort_keys=True),
                 json.dumps(row.get("rationale", []), sort_keys=True),
                 row.get("close"),
@@ -350,6 +366,7 @@ def upsert_scan_symbol_decisions(
                 run_id, symbol, timestamp_utc, runtime_mode, as_of_date,
                 final_passed, market_regime, directional_state, iv_state, signal_state,
                 strategy_type, final_score, min_score_required,
+                blocking_reasons_json, soft_penalty_reasons_json,
                 rejection_reasons_json, rationale_json,
                 close, dma20, dma50, atr20, adx14, iv_rank, iv_hv_ratio,
                 market_breadth_pct_above_20dma,
@@ -369,7 +386,7 @@ def upsert_scan_symbol_decisions(
                 options_context_final_score_after_context, options_context_final_passed_after_context,
                 created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(run_id, symbol) DO UPDATE SET
                 timestamp_utc=excluded.timestamp_utc,
                 runtime_mode=excluded.runtime_mode,
@@ -382,6 +399,8 @@ def upsert_scan_symbol_decisions(
                 strategy_type=excluded.strategy_type,
                 final_score=excluded.final_score,
                 min_score_required=excluded.min_score_required,
+                blocking_reasons_json=excluded.blocking_reasons_json,
+                soft_penalty_reasons_json=excluded.soft_penalty_reasons_json,
                 rejection_reasons_json=excluded.rejection_reasons_json,
                 rationale_json=excluded.rationale_json,
                 close=excluded.close,

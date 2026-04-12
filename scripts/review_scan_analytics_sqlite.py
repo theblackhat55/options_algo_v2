@@ -91,9 +91,9 @@ def _load_symbol_rows_for_runs(
             min_score_required,
             strategy_type,
             directional_state,
+            blocking_reasons_json,
+            soft_penalty_reasons_json,
             rejection_reasons_json,
-            options_context_reason_codes_json,
-            options_context_advisory_reason_codes_json,
             options_summary_regime
         FROM scan_symbol_decisions
         WHERE run_id IN ({placeholders})
@@ -202,8 +202,8 @@ def main() -> None:
             entry["gap_sum"] += gap
             entry["gap_count"] += 1
 
-        blocking = _json_list(row.get("rejection_reasons_json"))
-        soft = _json_list(row.get("options_context_reason_codes_json"))
+        blocking = _json_list(row.get("blocking_reasons_json"))
+        soft = _json_list(row.get("soft_penalty_reasons_json"))
 
         entry["blocking_reason_counts"].update(str(x) for x in blocking)
         entry["soft_penalty_reason_counts"].update(str(x) for x in soft)
