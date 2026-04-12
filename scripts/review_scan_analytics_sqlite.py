@@ -220,24 +220,28 @@ def main() -> None:
             entry["gap_count"] += 1
 
         pre_context_score = row.get("options_context_pre_context_score")
+        pre_context_score_value = None
+        valid_pre_context_row = False
         if pre_context_score is not None:
             try:
                 pre_context_score_value = float(pre_context_score)
-                entry["pre_context_score_sum"] += pre_context_score_value
-                entry["pre_context_score_count"] += 1
+                if pre_context_score_value > 0.0:
+                    valid_pre_context_row = True
+                    entry["pre_context_score_sum"] += pre_context_score_value
+                    entry["pre_context_score_count"] += 1
 
-                final_score_value = row.get("final_score")
-                if final_score_value is not None:
-                    final_score_value = float(final_score_value)
-                    entry["score_uplift_sum"] += round(
-                        final_score_value - pre_context_score_value, 3
-                    )
-                    entry["score_uplift_count"] += 1
+                    final_score_value = row.get("final_score")
+                    if final_score_value is not None:
+                        final_score_value = float(final_score_value)
+                        entry["score_uplift_sum"] += round(
+                            final_score_value - pre_context_score_value, 3
+                        )
+                        entry["score_uplift_count"] += 1
             except (TypeError, ValueError):
                 pass
 
         pre_context_gap = row.get("options_context_pre_context_score_gap")
-        if pre_context_gap is not None:
+        if valid_pre_context_row and pre_context_gap is not None:
             try:
                 entry["pre_context_gap_sum"] += float(pre_context_gap)
                 entry["pre_context_gap_count"] += 1
