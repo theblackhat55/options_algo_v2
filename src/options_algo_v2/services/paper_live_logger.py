@@ -253,6 +253,18 @@ def build_symbol_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
             "options_context_final_passed_after_context": options_context_decision_debug_row.get(
                 "final_passed_after_context"
             ),
+            "options_context_borderline_score_pass": options_context_decision_debug_row.get(
+                "borderline_score_pass"
+            ),
+            "options_context_borderline_score_pass_tier_a": options_context_decision_debug_row.get(
+                "borderline_score_pass_tier_a"
+            ),
+            "options_context_borderline_score_pass_tier_b": options_context_decision_debug_row.get(
+                "borderline_score_pass_tier_b"
+            ),
+            "options_context_borderline_rescue_tier": options_context_decision_debug_row.get(
+                "borderline_rescue_tier"
+            ),
         }
         rows.append(row)
 

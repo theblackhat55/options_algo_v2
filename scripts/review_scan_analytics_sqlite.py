@@ -94,7 +94,11 @@ def _load_symbol_rows_for_runs(
             blocking_reasons_json,
             soft_penalty_reasons_json,
             rejection_reasons_json,
-            options_summary_regime
+            options_summary_regime,
+            options_context_borderline_score_pass,
+            options_context_borderline_score_pass_tier_a,
+            options_context_borderline_score_pass_tier_b,
+            options_context_borderline_rescue_tier
         FROM scan_symbol_decisions
         WHERE run_id IN ({placeholders})
     """
@@ -159,6 +163,10 @@ def main() -> None:
     repeated_borderline_failures = Counter()
     repeated_passed_with_soft_penalties = Counter()
     score_plus_soft_penalty_symbols = Counter()
+    tier_a_rescue_counts_by_symbol = Counter()
+    tier_b_rescue_counts_by_symbol = Counter()
+    normal_pass_counts_by_symbol = Counter()
+    rescued_pass_counts_by_symbol = Counter()
 
     for row in symbol_rows:
         sym = str(row.get("symbol") or "").upper()
@@ -204,6 +212,10 @@ def main() -> None:
 
         blocking = _json_list(row.get("blocking_reasons_json"))
         soft = _json_list(row.get("soft_penalty_reasons_json"))
+        borderline_score_pass = bool(row.get("options_context_borderline_score_pass"))
+        borderline_score_pass_tier_a = bool(row.get("options_context_borderline_score_pass_tier_a"))
+        borderline_score_pass_tier_b = bool(row.get("options_context_borderline_score_pass_tier_b"))
+        borderline_rescue_tier = str(row.get("options_context_borderline_rescue_tier") or "").upper()
 
         entry["blocking_reason_counts"].update(str(x) for x in blocking)
         entry["soft_penalty_reason_counts"].update(str(x) for x in soft)
@@ -222,6 +234,18 @@ def main() -> None:
 
         if passed and soft:
             repeated_passed_with_soft_penalties[sym] += 1
+
+        if passed:
+            if borderline_score_pass or borderline_rescue_tier in {"A", "B"}:
+                rescued_pass_counts_by_symbol[sym] += 1
+            else:
+                normal_pass_counts_by_symbol[sym] += 1
+
+            if borderline_score_pass_tier_a or borderline_rescue_tier == "A":
+                tier_a_rescue_counts_by_symbol[sym] += 1
+
+            if borderline_score_pass_tier_b or borderline_rescue_tier == "B":
+                tier_b_rescue_counts_by_symbol[sym] += 1
 
         if (not passed) and ("candidate score below minimum threshold" in [str(x) for x in blocking]) and len(soft) > 0:
             score_plus_soft_penalty_symbols[sym] += 1
@@ -271,6 +295,10 @@ def main() -> None:
         "repeated_passed_with_soft_penalties": _sorted_counter_dict(repeated_passed_with_soft_penalties),
         "repeated_top_trade_candidates": _sorted_counter_dict(repeated_top_candidates),
         "score_plus_soft_penalty_symbols": _sorted_counter_dict(score_plus_soft_penalty_symbols),
+        "tier_a_rescue_counts_by_symbol": _sorted_counter_dict(tier_a_rescue_counts_by_symbol),
+        "tier_b_rescue_counts_by_symbol": _sorted_counter_dict(tier_b_rescue_counts_by_symbol),
+        "normal_pass_counts_by_symbol": _sorted_counter_dict(normal_pass_counts_by_symbol),
+        "rescued_pass_counts_by_symbol": _sorted_counter_dict(rescued_pass_counts_by_symbol),
     }
 
     print(f"db_path: {summary['db_path']}")
@@ -299,6 +327,18 @@ def main() -> None:
 
     print("\nscore_plus_soft_penalty_symbols:")
     print(summary["score_plus_soft_penalty_symbols"])
+
+    print("\ntier_a_rescue_counts_by_symbol:")
+    print(summary["tier_a_rescue_counts_by_symbol"])
+
+    print("\ntier_b_rescue_counts_by_symbol:")
+    print(summary["tier_b_rescue_counts_by_symbol"])
+
+    print("\nnormal_pass_counts_by_symbol:")
+    print(summary["normal_pass_counts_by_symbol"])
+
+    print("\nrescued_pass_counts_by_symbol:")
+    print(summary["rescued_pass_counts_by_symbol"])
 
     if args.json_out:
         out_path = Path(args.json_out)
