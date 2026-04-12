@@ -304,12 +304,24 @@ def apply_options_context_to_decisions(
             "regime_call_heavy",
             "pcr_volume_extreme_call_heavy",
         }
+        max_allowed_borderline_soft_penalties = 2
 
         only_score_blocking = (
             blocking_reasons_with_score == {"candidate score below minimum threshold"}
         )
-        soft_penalties_allowlisted = set(extra_reasons).issubset(
+
+        effective_soft_penalties = sorted(
+            {
+                reason
+                for reason in rejection_reasons
+                if reason not in blocking_reasons_with_score
+            }
+        )
+        soft_penalties_allowlisted = set(effective_soft_penalties).issubset(
             allowed_borderline_soft_penalties
+        )
+        soft_penalty_count_ok = (
+            len(effective_soft_penalties) <= max_allowed_borderline_soft_penalties
         )
 
         borderline_score_pass = (
@@ -318,6 +330,7 @@ def apply_options_context_to_decisions(
             and score_gap <= 2.0
             and only_score_blocking
             and soft_penalties_allowlisted
+            and soft_penalty_count_ok
         )
 
         if borderline_score_pass:
@@ -354,6 +367,11 @@ def apply_options_context_to_decisions(
             "hard_reject": hard_reject,
             "applied_reason_codes": extra_reasons,
             "advisory_reason_codes": advisory_reasons,
+            "effective_soft_penalties": effective_soft_penalties,
+            "only_score_blocking": only_score_blocking,
+            "soft_penalties_allowlisted": soft_penalties_allowlisted,
+            "soft_penalty_count_ok": soft_penalty_count_ok,
+            "borderline_score_pass": borderline_score_pass,
             "final_score_after_context": new_final_score,
             "final_passed_after_context": final_passed,
             "options_summary_regime": context_row.get("options_summary_regime"),
