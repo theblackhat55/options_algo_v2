@@ -12,6 +12,7 @@ from options_algo_v2.services.databento_runtime_info import (
     build_databento_runtime_info,
 )
 from options_algo_v2.services.decision_diagnostics import (
+    borderline_score_failure_summary,
     count_blocking_reasons,
     count_directional_blockers,
     count_directional_states,
@@ -484,6 +485,9 @@ def build_scan_result(
         ),
         "directional_failure_summary": directional_failure_summary(serialized_decisions),
         "score_plus_soft_penalty_summary": score_plus_soft_penalty_summary(
+            serialized_decisions
+        ),
+        "borderline_score_failure_summary": borderline_score_failure_summary(
             serialized_decisions
         ),
         "passed_with_soft_penalties_symbols": passed_with_soft_penalties_symbols,

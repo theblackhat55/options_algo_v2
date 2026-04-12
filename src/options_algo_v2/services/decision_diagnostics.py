@@ -461,3 +461,51 @@ def score_plus_soft_penalty_summary(serialized_decisions) -> dict[str, object]:
         "soft_penalty_counts": dict(sorted(soft_counts.items())),
         "rows": summary_rows,
     }
+
+
+def borderline_score_failure_summary(
+    serialized_decisions,
+    *,
+    min_score: float = 65.0,
+    max_score: float = 70.0,
+) -> dict[str, object]:
+    rows: list[dict[str, object]] = []
+
+    for item in serialized_decisions:
+        if bool(item.get("final_passed")):
+            continue
+
+        final_score = item.get("final_score")
+        if not isinstance(final_score, (int, float)):
+            continue
+
+        score = float(final_score)
+        if not (min_score <= score < max_score):
+            continue
+
+        rows.append(
+            {
+                "symbol": item.get("symbol"),
+                "final_score": score,
+                "strategy_type": item.get("strategy_type"),
+                "directional_state": item.get("directional_state"),
+                "blocking_reasons": list(item.get("blocking_reasons") or []),
+                "soft_penalty_reasons": list(item.get("soft_penalty_reasons") or []),
+                "score_breakdown": dict(item.get("score_breakdown") or {}),
+            }
+        )
+
+    rows.sort(key=lambda x: float(x["final_score"]), reverse=True)
+
+    soft_counts: dict[str, int] = {}
+    for row in rows:
+        for reason in row["soft_penalty_reasons"]:
+            key = str(reason)
+            soft_counts[key] = soft_counts.get(key, 0) + 1
+
+    return {
+        "count": len(rows),
+        "symbols": [str(row.get("symbol", "unknown")) for row in rows],
+        "soft_penalty_counts": dict(sorted(soft_counts.items())),
+        "rows": rows,
+    }
