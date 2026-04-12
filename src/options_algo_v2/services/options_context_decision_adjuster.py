@@ -305,6 +305,8 @@ def apply_options_context_to_decisions(
             "pcr_volume_extreme_call_heavy",
         }
         max_allowed_borderline_soft_penalties = 2
+        tier_b_allowed_soft_penalties = {"weak_iv_coverage"}
+        tier_b_max_soft_penalties = 1
 
         only_score_blocking = (
             blocking_reasons_with_score == {"candidate score below minimum threshold"}
@@ -324,13 +326,26 @@ def apply_options_context_to_decisions(
             len(effective_soft_penalties) <= max_allowed_borderline_soft_penalties
         )
 
-        borderline_score_pass = (
+        borderline_score_pass_tier_a = (
             (not score_meets_threshold)
             and new_final_score >= 68.0
             and score_gap <= 2.0
             and only_score_blocking
             and soft_penalties_allowlisted
             and soft_penalty_count_ok
+        )
+
+        borderline_score_pass_tier_b = (
+            (not score_meets_threshold)
+            and 67.0 <= new_final_score < 68.0
+            and score_gap <= 3.0
+            and only_score_blocking
+            and set(effective_soft_penalties).issubset(tier_b_allowed_soft_penalties)
+            and len(effective_soft_penalties) <= tier_b_max_soft_penalties
+        )
+
+        borderline_score_pass = (
+            borderline_score_pass_tier_a or borderline_score_pass_tier_b
         )
 
         if borderline_score_pass:
@@ -371,7 +386,12 @@ def apply_options_context_to_decisions(
             "only_score_blocking": only_score_blocking,
             "soft_penalties_allowlisted": soft_penalties_allowlisted,
             "soft_penalty_count_ok": soft_penalty_count_ok,
+            "borderline_score_pass_tier_a": borderline_score_pass_tier_a,
+            "borderline_score_pass_tier_b": borderline_score_pass_tier_b,
             "borderline_score_pass": borderline_score_pass,
+            "borderline_rescue_tier": (
+                "A" if borderline_score_pass_tier_a else "B" if borderline_score_pass_tier_b else None
+            ),
             "final_score_after_context": new_final_score,
             "final_passed_after_context": final_passed,
             "options_summary_regime": context_row.get("options_summary_regime"),
