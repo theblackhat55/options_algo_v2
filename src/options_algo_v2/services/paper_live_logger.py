@@ -35,15 +35,23 @@ def _ensure_parent(path: Path) -> None:
 def _load_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
-
     rows: list[dict[str, Any]] = []
-    with path.open("r", encoding="utf-8") as handle:
-        for line in handle:
-            line = line.strip()
-            if not line:
-                continue
-            rows.append(json.loads(line))
-    return rows
+    for line in path.read_text().splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        borderline_score_pass = options_context_decision_debug_row.get(
+            "borderline_score_pass"
+        )
+        borderline_score_pass_tier_a = options_context_decision_debug_row.get(
+            "borderline_score_pass_tier_a"
+        )
+        borderline_score_pass_tier_b = options_context_decision_debug_row.get(
+            "borderline_score_pass_tier_b"
+        )
+        borderline_rescue_tier = options_context_decision_debug_row.get(
+            "borderline_rescue_tier"
+        )
 
         if borderline_rescue_tier == "A" or borderline_score_pass_tier_a:
             borderline_score_pass = True
@@ -293,15 +301,6 @@ def build_symbol_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
             ),
             "options_context_final_passed_after_context": options_context_decision_debug_row.get(
                 "final_passed_after_context"
-            ),
-            "options_context_pre_context_score": options_context_decision_debug_row.get(
-                "pre_context_score"
-            ),
-            "options_context_pre_context_score_gap": options_context_decision_debug_row.get(
-                "pre_context_score_gap"
-            ),
-            "options_context_effective_soft_penalties": options_context_decision_debug_row.get(
-                "effective_soft_penalties", []
             ),
             "options_context_borderline_score_pass": borderline_score_pass,
             "options_context_borderline_score_pass_tier_a": borderline_score_pass_tier_a,
