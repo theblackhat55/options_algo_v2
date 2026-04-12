@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 import glob
 import json
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
 
 
@@ -42,6 +42,10 @@ def _is_borderline_failure(decision: dict) -> bool:
     )
 
 
+def _sorted_counter_dict(counter: Counter) -> dict[str, int]:
+    return dict(sorted(counter.items(), key=lambda kv: (-kv[1], kv[0])))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Review recent scan artifacts")
     parser.add_argument(
@@ -60,6 +64,11 @@ def main() -> None:
         nargs="*",
         default=[],
         help="Optional symbol filter",
+    )
+    parser.add_argument(
+        "--json-out",
+        default="",
+        help="Optional path to write the review summary as JSON",
     )
     args = parser.parse_args()
 
@@ -155,11 +164,6 @@ def main() -> None:
             if passed and soft:
                 repeated_passed_with_soft_penalties[sym] += 1
 
-    print("included_scan_files:")
-    for name in included_files:
-        print(" -", name)
-
-    print("\nper_symbol_summary:")
     ranked_symbols = sorted(
         per_symbol.items(),
         key=lambda kv: (
@@ -169,6 +173,8 @@ def main() -> None:
             kv[0],
         ),
     )
+
+    per_symbol_rows = []
     for sym, entry in ranked_symbols:
         avg_score = (
             round(entry["score_sum"] / entry["score_count"], 3)
@@ -180,7 +186,7 @@ def main() -> None:
             if entry["gap_count"]
             else None
         )
-        print(
+        per_symbol_rows.append(
             {
                 "symbol": sym,
                 "appearances": entry["appearances"],
@@ -188,28 +194,63 @@ def main() -> None:
                 "fails": entry["fails"],
                 "avg_final_score": avg_score,
                 "avg_score_gap": avg_gap,
-                "blocking_reason_counts": dict(entry["blocking_reason_counts"]),
-                "soft_penalty_reason_counts": dict(entry["soft_penalty_reason_counts"]),
+                "blocking_reason_counts": _sorted_counter_dict(
+                    entry["blocking_reason_counts"]
+                ),
+                "soft_penalty_reason_counts": _sorted_counter_dict(
+                    entry["soft_penalty_reason_counts"]
+                ),
             }
         )
 
+    summary = {
+        "included_scan_files": included_files,
+        "per_symbol_summary": per_symbol_rows,
+        "global_blocking_reason_totals": _sorted_counter_dict(blocker_totals),
+        "global_soft_penalty_reason_totals": _sorted_counter_dict(soft_penalty_totals),
+        "repeated_borderline_failures": _sorted_counter_dict(
+            repeated_borderline_failures
+        ),
+        "repeated_passed_with_soft_penalties": _sorted_counter_dict(
+            repeated_passed_with_soft_penalties
+        ),
+        "repeated_top_trade_candidates": _sorted_counter_dict(repeated_top_candidates),
+        "score_plus_soft_penalty_symbols": _sorted_counter_dict(
+            score_plus_soft_penalty_symbols
+        ),
+    }
+
+    print("included_scan_files:")
+    for name in summary["included_scan_files"]:
+        print(" -", name)
+
+    print("\nper_symbol_summary:")
+    for row in summary["per_symbol_summary"]:
+        print(row)
+
     print("\nglobal_blocking_reason_totals:")
-    print(dict(blocker_totals))
+    print(summary["global_blocking_reason_totals"])
 
     print("\nglobal_soft_penalty_reason_totals:")
-    print(dict(soft_penalty_totals))
+    print(summary["global_soft_penalty_reason_totals"])
 
     print("\nrepeated_borderline_failures:")
-    print(dict(repeated_borderline_failures))
+    print(summary["repeated_borderline_failures"])
 
     print("\nrepeated_passed_with_soft_penalties:")
-    print(dict(repeated_passed_with_soft_penalties))
+    print(summary["repeated_passed_with_soft_penalties"])
 
     print("\nrepeated_top_trade_candidates:")
-    print(dict(repeated_top_candidates))
+    print(summary["repeated_top_trade_candidates"])
 
     print("\nscore_plus_soft_penalty_symbols:")
-    print(dict(score_plus_soft_penalty_symbols))
+    print(summary["score_plus_soft_penalty_symbols"])
+
+    if args.json_out:
+        out_path = Path(args.json_out)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps(summary, indent=2, sort_keys=True))
+        print(f"\njson_written_to: {out_path}")
 
 
 if __name__ == "__main__":
