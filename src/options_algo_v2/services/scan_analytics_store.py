@@ -40,6 +40,22 @@ def _ensure_scan_symbol_decisions_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE scan_symbol_decisions ADD COLUMN blocking_reasons_json TEXT")
     if "soft_penalty_reasons_json" not in existing:
         conn.execute("ALTER TABLE scan_symbol_decisions ADD COLUMN soft_penalty_reasons_json TEXT")
+    if "options_context_borderline_score_pass" not in existing:
+        conn.execute(
+            "ALTER TABLE scan_symbol_decisions ADD COLUMN options_context_borderline_score_pass INTEGER"
+        )
+    if "options_context_borderline_score_pass_tier_a" not in existing:
+        conn.execute(
+            "ALTER TABLE scan_symbol_decisions ADD COLUMN options_context_borderline_score_pass_tier_a INTEGER"
+        )
+    if "options_context_borderline_score_pass_tier_b" not in existing:
+        conn.execute(
+            "ALTER TABLE scan_symbol_decisions ADD COLUMN options_context_borderline_score_pass_tier_b INTEGER"
+        )
+    if "options_context_borderline_rescue_tier" not in existing:
+        conn.execute(
+            "ALTER TABLE scan_symbol_decisions ADD COLUMN options_context_borderline_rescue_tier TEXT"
+        )
 
 
 def init_scan_analytics_store(
@@ -144,6 +160,10 @@ def init_scan_analytics_store(
                 options_context_hard_reject INTEGER,
                 options_context_final_score_after_context REAL,
                 options_context_final_passed_after_context INTEGER,
+                options_context_borderline_score_pass INTEGER,
+                options_context_borderline_score_pass_tier_a INTEGER,
+                options_context_borderline_score_pass_tier_b INTEGER,
+                options_context_borderline_rescue_tier TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 PRIMARY KEY (run_id, symbol)
@@ -354,6 +374,10 @@ def upsert_scan_symbol_decisions(
                 int(bool(row.get("options_context_hard_reject"))) if row.get("options_context_hard_reject") is not None else None,
                 row.get("options_context_final_score_after_context"),
                 int(bool(row.get("options_context_final_passed_after_context"))) if row.get("options_context_final_passed_after_context") is not None else None,
+                int(bool(row.get("options_context_borderline_score_pass"))) if row.get("options_context_borderline_score_pass") is not None else None,
+                int(bool(row.get("options_context_borderline_score_pass_tier_a"))) if row.get("options_context_borderline_score_pass_tier_a") is not None else None,
+                int(bool(row.get("options_context_borderline_score_pass_tier_b"))) if row.get("options_context_borderline_score_pass_tier_b") is not None else None,
+                row.get("options_context_borderline_rescue_tier"),
                 now,
                 now,
             )
@@ -384,9 +408,11 @@ def upsert_scan_symbol_decisions(
                 options_context_reason_codes_json, options_context_advisory_reason_codes_json,
                 options_context_score_delta, options_context_hard_reject,
                 options_context_final_score_after_context, options_context_final_passed_after_context,
+                options_context_borderline_score_pass, options_context_borderline_score_pass_tier_a,
+                options_context_borderline_score_pass_tier_b, options_context_borderline_rescue_tier,
                 created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(run_id, symbol) DO UPDATE SET
                 timestamp_utc=excluded.timestamp_utc,
                 runtime_mode=excluded.runtime_mode,
@@ -445,6 +471,10 @@ def upsert_scan_symbol_decisions(
                 options_context_hard_reject=excluded.options_context_hard_reject,
                 options_context_final_score_after_context=excluded.options_context_final_score_after_context,
                 options_context_final_passed_after_context=excluded.options_context_final_passed_after_context,
+                options_context_borderline_score_pass=excluded.options_context_borderline_score_pass,
+                options_context_borderline_score_pass_tier_a=excluded.options_context_borderline_score_pass_tier_a,
+                options_context_borderline_score_pass_tier_b=excluded.options_context_borderline_score_pass_tier_b,
+                options_context_borderline_rescue_tier=excluded.options_context_borderline_rescue_tier,
                 updated_at=excluded.updated_at
             """,
             payload,
