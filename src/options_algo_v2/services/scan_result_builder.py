@@ -149,6 +149,9 @@ def _validate_trade_idea(trade_idea: dict[str, object]) -> tuple[bool, list[str]
     return (len(errors) == 0, errors)
 
 
+TRADE_VALIDATION_VERSION = "trade_validation_v1"
+
+
 def _attach_trade_validation_metadata(
     trade_ideas: list[dict[str, object]],
 ) -> list[dict[str, object]]:
@@ -159,6 +162,7 @@ def _attach_trade_validation_metadata(
         is_valid, errors = _validate_trade_idea(item)
         item["is_structurally_valid_trade"] = is_valid
         item["trade_validation_errors"] = errors
+        item["trade_validation_version"] = TRADE_VALIDATION_VERSION
         enriched.append(item)
 
     return enriched
@@ -311,6 +315,7 @@ def build_scan_result(
     run_id: str,
     decisions: list[CandidateDecision],
     degraded_metadata: dict[str, object] | None = None,
+    end_date: str | None = None,
 ) -> ScanResult:
     configs = load_rulebook_configs()
     execution_settings = get_runtime_execution_settings()
@@ -521,6 +526,13 @@ def build_scan_result(
         generated_at=generated_at,
         config_versions=config_versions,
         summary=summary,
+        end_date=end_date,
+        as_of_date=execution_settings.as_of_date.isoformat(),
+        historical_row_provider=get_historical_row_provider_name(),
+        options_provider=get_options_chain_provider_name(),
+        run_quality=runtime_metadata.get("run_quality"),
+        is_test_run=runtime_mode != "live",
+        trade_validation_version=TRADE_VALIDATION_VERSION,
         runtime_metadata=runtime_metadata,
         feature_sources=feature_sources,
         trade_candidates=ranked_trade_candidates,

@@ -22,6 +22,7 @@ def build_and_write_scan_artifact(
     base_dir: str | Path = "data/scan_results",
     run_id: str | None = None,
     degraded_metadata: dict[str, object] | None = None,
+    end_date: str | None = None,
 ) -> ScanArtifactResult:
     resolved_run_id = run_id or generate_run_id()
 
@@ -29,6 +30,7 @@ def build_and_write_scan_artifact(
         run_id=resolved_run_id,
         decisions=decisions,
         degraded_metadata=degraded_metadata or {},
+        end_date=end_date,
     )
 
     output_path = write_scan_result(

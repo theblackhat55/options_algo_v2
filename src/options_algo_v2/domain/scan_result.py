@@ -21,6 +21,13 @@ class ScanResult:
     generated_at: str
     config_versions: dict[str, str]
     summary: ScanSummary
+    end_date: str | None = None
+    as_of_date: str | None = None
+    historical_row_provider: str | None = None
+    options_provider: str | None = None
+    run_quality: str | None = None
+    is_test_run: bool = False
+    trade_validation_version: str | None = None
     runtime_metadata: dict[str, object] = field(default_factory=dict)
     feature_sources: list[dict[str, str]] = field(default_factory=list)
     trade_candidates: list[dict[str, object]] = field(default_factory=list)

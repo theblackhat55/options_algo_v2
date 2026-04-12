@@ -1049,6 +1049,7 @@ def run_nightly_scan(
 
     artifact_result = build_and_write_scan_artifact(
         decisions=decisions,
+        end_date=end_date,
         degraded_metadata={
             "as_of_date": execution_settings.as_of_date.isoformat(),
             "end_date": end_date,
