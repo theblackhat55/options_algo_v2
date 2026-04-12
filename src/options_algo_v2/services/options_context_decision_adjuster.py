@@ -289,17 +289,35 @@ def apply_options_context_to_decisions(
             blocking_reasons.add("options_context_untradable")
 
         score_meets_threshold = new_final_score >= float(decision.min_score_required)
+        score_gap = float(decision.min_score_required) - new_final_score
+
         if not score_meets_threshold:
             if "candidate score below minimum threshold" not in rejection_reasons:
                 rejection_reasons.append("candidate score below minimum threshold")
 
-        only_score_blocking = len(blocking_reasons) == 0
-        no_soft_penalty_reasons = len(extra_reasons) == 0
+        blocking_reasons_with_score = set(blocking_reasons)
+        if "candidate score below minimum threshold" in rejection_reasons:
+            blocking_reasons_with_score.add("candidate score below minimum threshold")
+
+        allowed_borderline_soft_penalties = {
+            "weak_iv_coverage",
+            "regime_call_heavy",
+            "pcr_volume_extreme_call_heavy",
+        }
+
+        only_score_blocking = (
+            blocking_reasons_with_score == {"candidate score below minimum threshold"}
+        )
+        soft_penalties_allowlisted = set(extra_reasons).issubset(
+            allowed_borderline_soft_penalties
+        )
+
         borderline_score_pass = (
-            not score_meets_threshold
-            and new_final_score >= (float(decision.min_score_required) - 2.0)
+            (not score_meets_threshold)
+            and new_final_score >= 68.0
+            and score_gap <= 2.0
             and only_score_blocking
-            and no_soft_penalty_reasons
+            and soft_penalties_allowlisted
         )
 
         if borderline_score_pass:
@@ -309,9 +327,16 @@ def apply_options_context_to_decisions(
                 if reason != "candidate score below minimum threshold"
             ]
 
-        final_passed = (score_meets_threshold or borderline_score_pass) and not (
-            blocking_reasons - {"candidate score below minimum threshold"}
-        )
+        effective_blocking_reasons = set(blocking_reasons)
+        if (
+            not borderline_score_pass
+            and "candidate score below minimum threshold" in rejection_reasons
+        ):
+            effective_blocking_reasons.add("candidate score below minimum threshold")
+
+        final_passed = (
+            score_meets_threshold or borderline_score_pass
+        ) and not effective_blocking_reasons
 
         adjusted_decision = replace(
             decision,
