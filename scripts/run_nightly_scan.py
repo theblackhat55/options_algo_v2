@@ -27,7 +27,12 @@ from options_algo_v2.services.live_raw_feature_pipeline import (
     build_live_raw_feature_input,
     build_live_raw_feature_input_from_rows,
 )
-from options_algo_v2.services.history_store import upsert_iv_proxy_rows
+from options_algo_v2.services.history_store import (
+    upsert_iv_proxy_rows,
+    upsert_options_chain_snapshot_summary,
+    upsert_options_contract_quotes_daily,
+    upsert_trade_candidate_inputs,
+)
 from options_algo_v2.services.market_breadth_provider_factory import (
     build_market_breadth_provider,
 )
@@ -934,6 +939,8 @@ def run_nightly_scan(
         "zero_volume_quotes": 0,
         "wide_spread_quotes": 0,
     }
+    options_chain_summary_rows: list[dict[str, object]] = []
+    options_contract_quote_rows: list[dict[str, object]] = []
 
     for symbol in selected_symbols:
         (
@@ -983,6 +990,49 @@ def run_nightly_scan(
             snapshot=snapshot,
         )
 
+        persistence_as_of_date = end_date or execution_settings.as_of_date.isoformat()
+        snapshot_quotes = list(getattr(snapshot, "quotes", []) or [])
+        snapshot_expirations = sorted(
+            {
+                str(getattr(quote, "expiration", "") or "")
+                for quote in snapshot_quotes
+                if getattr(quote, "expiration", None)
+            }
+        )
+        options_chain_summary_rows.append(
+            {
+                "symbol": symbol,
+                "as_of_date": persistence_as_of_date,
+                "snapshot_as_of": getattr(snapshot, "as_of", None),
+                "source_provider": getattr(snapshot, "source", "unknown") or "unknown",
+                "quote_count": len(snapshot_quotes),
+                "expiration_count": len(snapshot_expirations),
+                "min_expiration": snapshot_expirations[0] if snapshot_expirations else None,
+                "max_expiration": snapshot_expirations[-1] if snapshot_expirations else None,
+                "underlying_price": getattr(raw, "close", None),
+            }
+        )
+        for quote in snapshot_quotes:
+            options_contract_quote_rows.append(
+                {
+                    "symbol": symbol,
+                    "as_of_date": persistence_as_of_date,
+                    "option_symbol": getattr(quote, "option_symbol", ""),
+                    "expiration": getattr(quote, "expiration", None),
+                    "strike": getattr(quote, "strike", None),
+                    "option_type": getattr(quote, "option_type", None),
+                    "bid": getattr(quote, "bid", None),
+                    "ask": getattr(quote, "ask", None),
+                    "mid": getattr(quote, "mid", None),
+                    "delta": getattr(quote, "delta", None),
+                    "implied_volatility": getattr(quote, "implied_volatility", None),
+                    "open_interest": getattr(quote, "open_interest", None),
+                    "volume": getattr(quote, "volume", None),
+                    "source_provider": getattr(snapshot, "source", "unknown") or "unknown",
+                    "snapshot_as_of": getattr(snapshot, "as_of", None),
+                }
+            )
+
         if used_placeholder_iv_rank:
             placeholder_iv_rank_symbols.append(symbol)
         else:
@@ -994,6 +1044,18 @@ def run_nightly_scan(
         if used_breadth_override:
             breadth_override_symbols.append(symbol)
         raw_features.append(raw)
+
+    history_db_path = Path(
+        os.getenv("MARKET_HISTORY_DB_PATH", "data/cache/market_history_watchlist60.db")
+    )
+    persisted_options_chain_summary_count = upsert_options_chain_snapshot_summary(
+        rows=options_chain_summary_rows,
+        db_path=history_db_path,
+    )
+    persisted_options_contract_quote_count = upsert_options_contract_quotes_daily(
+        rows=options_contract_quote_rows,
+        db_path=history_db_path,
+    )
 
     used_mock_historical_fallback = any(
         mode == "mock_historical_fallback"
@@ -1106,6 +1168,29 @@ def run_nightly_scan(
             **options_context_summary,
         },
     )
+
+    persisted_trade_candidate_input_count = upsert_trade_candidate_inputs(
+        rows=[
+            {
+                "symbol": str(item.get("symbol")),
+                "as_of_date": end_date or execution_settings.as_of_date.isoformat(),
+                "strategy_family": item.get("strategy_family"),
+                "expiration": item.get("expiration"),
+                "short_option_symbol": (item.get("short_leg") or {}).get("option_symbol"),
+                "short_strike": (item.get("short_leg") or {}).get("strike"),
+                "long_option_symbol": (item.get("long_leg") or {}).get("option_symbol"),
+                "long_strike": (item.get("long_leg") or {}).get("strike"),
+                "width": item.get("width"),
+                "net_credit": item.get("net_credit"),
+                "net_debit": item.get("net_debit"),
+                "selection_score": item.get("selection_score"),
+                "source_run_id": artifact_result.scan_result.run_id,
+            }
+            for item in artifact_result.scan_result.trade_candidates
+        ],
+        db_path=history_path,
+    )
+
     output_path = artifact_result.output_path
     artifact = output_path.read_text()
 
@@ -1121,6 +1206,9 @@ def run_nightly_scan(
     print(f"strict_live_mode={execution_settings.strict_live_mode}")
     print(f"run_id={payload['run_id']}")
     print(f"output_path={output_path}")
+    print(f"persisted_options_chain_summary_count={persisted_options_chain_summary_count}")
+    print(f"persisted_options_contract_quote_count={persisted_options_contract_quote_count}")
+    print(f"persisted_trade_candidate_input_count={persisted_trade_candidate_input_count}")
 
     if resolved_runtime_mode == "live":
         if degraded_live_mode:
