@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 from run_nightly_scan import run_nightly_scan
@@ -56,11 +57,17 @@ def main() -> int:
     paths = default_paper_live_log_paths(args.validation_dir)
     append_paper_live_logs(payload=payload, paths=paths)
 
+    analytics_db_path = Path(
+        os.getenv("MARKET_HISTORY_DB_PATH", "data/cache/market_history_watchlist60.db")
+    )
+
     persisted_scan_run_summary_count = upsert_scan_run_summary_rows(
         rows=[build_run_summary_row(payload)],
+        db_path=analytics_db_path,
     )
     persisted_scan_symbol_decision_count = upsert_scan_symbol_decisions(
         rows=build_symbol_rows(payload),
+        db_path=analytics_db_path,
     )
 
     print("paper_live_log_paths:")
@@ -68,6 +75,7 @@ def main() -> int:
     print(f"  symbol_jsonl={paths.symbol_jsonl}")
     print(f"  run_csv={paths.run_csv}")
     print(f"  logged_run_id={payload.get('run_id')}")
+    print(f"  analytics_db_path={analytics_db_path}")
     print(f"  persisted_scan_run_summary_count={persisted_scan_run_summary_count}")
     print(f"  persisted_scan_symbol_decision_count={persisted_scan_symbol_decision_count}")
     return 0
