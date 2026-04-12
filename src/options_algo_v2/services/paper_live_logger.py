@@ -40,6 +40,30 @@ def _load_jsonl(path: Path) -> list[dict[str, Any]]:
         stripped = line.strip()
         if not stripped:
             continue
+        borderline_score_pass = options_context_decision_debug_row.get(
+            "borderline_score_pass"
+        )
+        borderline_score_pass_tier_a = options_context_decision_debug_row.get(
+            "borderline_score_pass_tier_a"
+        )
+        borderline_score_pass_tier_b = options_context_decision_debug_row.get(
+            "borderline_score_pass_tier_b"
+        )
+        borderline_rescue_tier = options_context_decision_debug_row.get(
+            "borderline_rescue_tier"
+        )
+
+        if borderline_rescue_tier == "A" or borderline_score_pass_tier_a:
+            borderline_score_pass = True
+            borderline_score_pass_tier_a = True
+            borderline_score_pass_tier_b = False
+            borderline_rescue_tier = "A"
+        elif borderline_rescue_tier == "B" or borderline_score_pass_tier_b:
+            borderline_score_pass = True
+            borderline_score_pass_tier_a = False
+            borderline_score_pass_tier_b = True
+            borderline_rescue_tier = "B"
+
         rows.append(json.loads(stripped))
     return rows
 
@@ -145,37 +169,62 @@ def build_run_summary_row(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def build_symbol_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    runtime_metadata = payload.get("runtime_metadata", {})
-    feature_debug = runtime_metadata.get("feature_debug_by_symbol", {})
-    decision_trace = runtime_metadata.get("decision_trace_by_symbol", {})
-    options_context_by_symbol = runtime_metadata.get("options_context_by_symbol", {})
-    options_context_decision_debug_by_symbol = runtime_metadata.get(
-        "options_context_decision_debug_by_symbol",
-        {},
+    runtime_metadata = payload.get("runtime_metadata", {}) or {}
+    timestamp_utc = _utc_timestamp()
+    run_id = payload.get("run_id")
+    runtime_mode = runtime_metadata.get("runtime_mode")
+    as_of_date = runtime_metadata.get("as_of_date")
+
+    decisions = payload.get("decisions", []) or []
+    feature_rows = runtime_metadata.get("feature_rows_by_symbol", {}) or {}
+    trade_rows = runtime_metadata.get("top_trade_summary_rows_by_symbol", {}) or {}
+    options_context_by_symbol = runtime_metadata.get("options_context_by_symbol", {}) or {}
+    options_context_decision_debug_by_symbol = (
+        runtime_metadata.get("options_context_decision_debug_by_symbol")
+        or runtime_metadata.get("options_context_decision_debug")
+        or {}
     )
 
     rows: list[dict[str, Any]] = []
-    for decision in payload.get("decisions", []):
-        if not isinstance(decision, dict):
-            continue
 
+    for decision in decisions:
         symbol = decision.get("symbol")
-        if not isinstance(symbol, str) or not symbol:
-            continue
-
-        feature_row = feature_debug.get(symbol, {})
-        trace_row = decision_trace.get(symbol, {})
-        options_context_row = options_context_by_symbol.get(symbol, {})
-        options_context_decision_debug_row = options_context_decision_debug_by_symbol.get(
-            symbol,
-            {},
+        feature_row = feature_rows.get(symbol, {}) or {}
+        trace_row = trade_rows.get(symbol, {}) or {}
+        options_context_row = options_context_by_symbol.get(symbol, {}) or {}
+        options_context_decision_debug_row = (
+            options_context_decision_debug_by_symbol.get(symbol, {}) or {}
         )
 
+        borderline_score_pass = options_context_decision_debug_row.get(
+            "borderline_score_pass"
+        )
+        borderline_score_pass_tier_a = options_context_decision_debug_row.get(
+            "borderline_score_pass_tier_a"
+        )
+        borderline_score_pass_tier_b = options_context_decision_debug_row.get(
+            "borderline_score_pass_tier_b"
+        )
+        borderline_rescue_tier = options_context_decision_debug_row.get(
+            "borderline_rescue_tier"
+        )
+
+        if borderline_rescue_tier == "A" or borderline_score_pass_tier_a:
+            borderline_score_pass = True
+            borderline_score_pass_tier_a = True
+            borderline_score_pass_tier_b = False
+            borderline_rescue_tier = "A"
+        elif borderline_rescue_tier == "B" or borderline_score_pass_tier_b:
+            borderline_score_pass = True
+            borderline_score_pass_tier_a = False
+            borderline_score_pass_tier_b = True
+            borderline_rescue_tier = "B"
+
         row = {
-            "timestamp_utc": _utc_timestamp(),
-            "run_id": payload.get("run_id"),
-            "runtime_mode": runtime_metadata.get("runtime_mode"),
-            "as_of_date": runtime_metadata.get("as_of_date"),
+            "timestamp_utc": timestamp_utc,
+            "run_id": run_id,
+            "runtime_mode": runtime_mode,
+            "as_of_date": as_of_date,
             "symbol": symbol,
             "final_passed": decision.get("final_passed"),
             "market_regime": decision.get("market_regime"),
@@ -253,18 +302,10 @@ def build_symbol_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
             "options_context_final_passed_after_context": options_context_decision_debug_row.get(
                 "final_passed_after_context"
             ),
-            "options_context_borderline_score_pass": options_context_decision_debug_row.get(
-                "borderline_score_pass"
-            ),
-            "options_context_borderline_score_pass_tier_a": options_context_decision_debug_row.get(
-                "borderline_score_pass_tier_a"
-            ),
-            "options_context_borderline_score_pass_tier_b": options_context_decision_debug_row.get(
-                "borderline_score_pass_tier_b"
-            ),
-            "options_context_borderline_rescue_tier": options_context_decision_debug_row.get(
-                "borderline_rescue_tier"
-            ),
+            "options_context_borderline_score_pass": borderline_score_pass,
+            "options_context_borderline_score_pass_tier_a": borderline_score_pass_tier_a,
+            "options_context_borderline_score_pass_tier_b": borderline_score_pass_tier_b,
+            "options_context_borderline_rescue_tier": borderline_rescue_tier,
         }
         rows.append(row)
 
