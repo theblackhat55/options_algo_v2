@@ -71,8 +71,15 @@ def build_trade_idea(
 
     if strategy_family in {"BULL_PUT_SPREAD", "BEAR_CALL_SPREAD"}:
         max_risk = max(0.0, width - net_credit)
-    elif strategy_family in {"BULL_CALL_SPREAD", "BEAR_PUT_SPREAD"}:
+    elif strategy_family in {"BULL_CALL_SPREAD"}:
         max_risk = max(0.0, net_debit)
+    elif strategy_family in {"BEAR_PUT_SPREAD"}:
+        if net_debit > 0.0:
+            max_risk = max(0.0, net_debit)
+        elif net_credit > 0.0:
+            max_risk = max(0.0, width - net_credit)
+        else:
+            max_risk = 0.0
     else:
         max_risk = 0.0
 

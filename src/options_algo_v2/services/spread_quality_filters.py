@@ -8,7 +8,9 @@ def has_positive_width(candidate: TradeCandidate) -> bool:
 
 
 def has_valid_net_debit_or_credit(candidate: TradeCandidate) -> bool:
-    return candidate.net_debit >= 0.0 and candidate.net_credit >= 0.0
+    if candidate.net_debit < 0.0 or candidate.net_credit < 0.0:
+        return False
+    return candidate.net_debit > 0.0 or candidate.net_credit > 0.0
 
 
 def passes_min_open_interest(
