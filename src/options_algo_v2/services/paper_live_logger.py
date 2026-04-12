@@ -149,9 +149,10 @@ def build_symbol_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
     feature_debug = runtime_metadata.get("feature_debug_by_symbol", {})
     decision_trace = runtime_metadata.get("decision_trace_by_symbol", {})
     options_context_by_symbol = runtime_metadata.get("options_context_by_symbol", {})
-    options_context_decision_debug_by_symbol = runtime_metadata.get(
-        "options_context_decision_debug_by_symbol",
-        {},
+    options_context_decision_debug_by_symbol = (
+        runtime_metadata.get("options_context_decision_debug_by_symbol")
+        or runtime_metadata.get("options_context_decision_debug")
+        or {}
     )
 
     rows: list[dict[str, Any]] = []
@@ -170,6 +171,30 @@ def build_symbol_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
             symbol,
             {},
         )
+
+        borderline_score_pass = options_context_decision_debug_row.get(
+            "borderline_score_pass"
+        )
+        borderline_score_pass_tier_a = options_context_decision_debug_row.get(
+            "borderline_score_pass_tier_a"
+        )
+        borderline_score_pass_tier_b = options_context_decision_debug_row.get(
+            "borderline_score_pass_tier_b"
+        )
+        borderline_rescue_tier = options_context_decision_debug_row.get(
+            "borderline_rescue_tier"
+        )
+
+        if borderline_rescue_tier == "A" or borderline_score_pass_tier_a:
+            borderline_score_pass = True
+            borderline_score_pass_tier_a = True
+            borderline_score_pass_tier_b = False
+            borderline_rescue_tier = "A"
+        elif borderline_rescue_tier == "B" or borderline_score_pass_tier_b:
+            borderline_score_pass = True
+            borderline_score_pass_tier_a = False
+            borderline_score_pass_tier_b = True
+            borderline_rescue_tier = "B"
 
         row = {
             "timestamp_utc": _utc_timestamp(),
@@ -236,6 +261,34 @@ def build_symbol_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
             "options_context_reason_codes": options_context_decision_debug_row.get(
                 "applied_reason_codes", []
             ),
+            "options_context_advisory_reason_codes": options_context_decision_debug_row.get(
+                "advisory_reason_codes", []
+            ),
+            "options_context_score_delta": options_context_decision_debug_row.get(
+                "score_delta"
+            ),
+            "options_context_hard_reject": options_context_decision_debug_row.get(
+                "hard_reject"
+            ),
+            "options_context_final_score_after_context": options_context_decision_debug_row.get(
+                "final_score_after_context"
+            ),
+            "options_context_final_passed_after_context": options_context_decision_debug_row.get(
+                "final_passed_after_context"
+            ),
+            "options_context_pre_context_score": options_context_decision_debug_row.get(
+                "pre_context_score"
+            ),
+            "options_context_pre_context_score_gap": options_context_decision_debug_row.get(
+                "pre_context_score_gap"
+            ),
+            "options_context_effective_soft_penalties": options_context_decision_debug_row.get(
+                "effective_soft_penalties", []
+            ),
+            "options_context_borderline_score_pass": borderline_score_pass,
+            "options_context_borderline_score_pass_tier_a": borderline_score_pass_tier_a,
+            "options_context_borderline_score_pass_tier_b": borderline_score_pass_tier_b,
+            "options_context_borderline_rescue_tier": borderline_rescue_tier,
             "options_context_score_delta": options_context_decision_debug_row.get(
                 "score_delta"
             ),
