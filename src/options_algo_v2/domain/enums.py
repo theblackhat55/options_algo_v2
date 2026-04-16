@@ -27,6 +27,8 @@ class IVState(StrEnum):
 
 
 class StrategyType(StrEnum):
+    LONG_CALL = "LONG_CALL"
+    LONG_PUT = "LONG_PUT"
     BULL_PUT_SPREAD = "BULL_PUT_SPREAD"
     BEAR_CALL_SPREAD = "BEAR_CALL_SPREAD"
     BULL_CALL_SPREAD = "BULL_CALL_SPREAD"

@@ -9,6 +9,7 @@ from options_algo_v2.domain.enums import (
     StrategyType,
 )
 from options_algo_v2.services.rulebook_policy import regime_allows_strategy
+from options_algo_v2.services.strategy_eligibility import eligible_directional_strategies
 
 
 def _reject_candidate(
@@ -38,6 +39,7 @@ def select_strategy_candidate(
     market_regime: MarketRegime,
     directional_state: DirectionalState,
     iv_state: IVState,
+    expected_move_fit: bool = False,
 ) -> StrategyCandidate:
     if market_regime in {
         MarketRegime.RISK_OFF,
@@ -64,6 +66,12 @@ def select_strategy_candidate(
         )
 
     strategy_type: StrategyType
+
+    eligible_strategies = eligible_directional_strategies(
+        directional_state=directional_state,
+        iv_state=iv_state,
+        expected_move_1d_pct=4.0 if expected_move_fit else 1.0,
+    )
 
     if directional_state in {
         DirectionalState.BULLISH_CONTINUATION,
@@ -105,7 +113,14 @@ def select_strategy_candidate(
         f"directional_state={directional_state.value}",
         f"iv_state={iv_state.value}",
         f"selected_strategy={strategy_type.value}",
+        "eligible_strategies=" + ",".join(s.value for s in eligible_strategies),
     ]
+
+    if StrategyType.LONG_CALL in eligible_strategies:
+        rationale.append("long_call_alternative_eligible")
+
+    if StrategyType.LONG_PUT in eligible_strategies:
+        rationale.append("long_put_alternative_eligible")
 
     if market_regime == MarketRegime.RANGE_UNCLEAR:
         rationale.append("range_unclear_allowed_for_defined_risk_spread")

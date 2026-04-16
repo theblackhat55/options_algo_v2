@@ -24,6 +24,7 @@ def evaluate_candidate_decision(
         market_regime=evaluation_input.market_regime,
         directional_state=evaluation_input.directional_state,
         iv_state=evaluation_input.iv_state,
+        expected_move_fit=evaluation_input.expected_move_fit,
     )
 
     event_result = passes_event_filter(
