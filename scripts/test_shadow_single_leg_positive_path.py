@@ -15,23 +15,17 @@ from options_algo_v2.services.single_leg_shadow_mode import (
 def main() -> int:
     decision = SimpleNamespace(
         qualified=True,
-        strategy_type=StrategyType.BULL_CALL_SPREAD,
-        rationale=[
-            "market_regime=TREND_UP",
-            "directional_state=BULLISH_BREAKOUT",
-            "iv_state=IV_NORMAL",
-            "selected_strategy=BULL_CALL_SPREAD",
-            "eligible_strategies=BULL_CALL_SPREAD,LONG_CALL",
-            "long_call_alternative_eligible",
-        ],
+        iv_rank=45.0,
+        iv_hv_ratio=1.1,
+        rationale=["long_call_alternative_eligible"],
         candidate=SimpleNamespace(
             symbol="NFLX",
             strategy_type=StrategyType.BULL_CALL_SPREAD,
+            rationale=["long_call_alternative_eligible"],
         ),
-        symbol="NFLX",
     )
 
-    options_chain = OptionsChainSnapshot(
+    chain = OptionsChainSnapshot(
         symbol="NFLX",
         as_of="2026-04-16T19:00:00Z",
         source="test_harness",
@@ -83,11 +77,11 @@ def main() -> int:
 
     debug = build_shadow_single_leg_debug(
         decision=decision,
-        options_chain=options_chain,
+        options_chain=chain,
     )
     candidates = build_shadow_single_leg_candidates(
         decision=decision,
-        options_chain=options_chain,
+        options_chain=chain,
         as_of_date=date(2026, 4, 16),
         limit=1,
     )
