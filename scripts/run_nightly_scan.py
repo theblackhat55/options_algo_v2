@@ -59,6 +59,10 @@ from options_algo_v2.services.scan_artifact_orchestrator import (
     build_and_write_scan_artifact,
 )
 from options_algo_v2.services.scan_result_writer import write_scan_result
+from options_algo_v2.services.single_leg_shadow_mode import (
+    build_shadow_single_leg_candidates,
+    build_shadow_single_leg_debug,
+)
 from options_algo_v2.services.universe_loader import load_universe_symbols
 
 
@@ -942,6 +946,7 @@ def run_nightly_scan(
     }
     options_chain_summary_rows: list[dict[str, object]] = []
     options_contract_quote_rows: list[dict[str, object]] = []
+    options_chain_snapshots_by_symbol: dict[str, OptionsChainSnapshot] = {}
 
     for symbol in selected_symbols:
         (
@@ -1045,6 +1050,8 @@ def run_nightly_scan(
         if used_breadth_override:
             breadth_override_symbols.append(symbol)
         raw_features.append(raw)
+        if snapshot is not None:
+            options_chain_snapshots_by_symbol[str(symbol).upper()] = snapshot
 
     history_db_path = Path(
         os.getenv("MARKET_HISTORY_DB_PATH", "data/cache/market_history_watchlist60.db")
@@ -1094,6 +1101,64 @@ def run_nightly_scan(
             decisions,
             options_context_by_symbol=options_context_by_symbol,
         )
+
+    shadow_single_leg_candidates_by_symbol: dict[str, list[dict[str, object]]] = {}
+    shadow_single_leg_debug_by_symbol: dict[str, dict[str, object]] = {}
+    for decision in decisions:
+        symbol = str(getattr(decision, "symbol", "") or "").upper()
+        if not symbol:
+            candidate = getattr(decision, "candidate", None)
+            symbol = str(getattr(candidate, "symbol", "") or "").upper()
+        if not symbol:
+            continue
+
+        snapshot = options_chain_snapshots_by_symbol.get(symbol)
+        shadow_debug = build_shadow_single_leg_debug(
+            decision=decision,
+            options_chain=snapshot,
+        )
+        shadow_single_leg_debug_by_symbol[symbol] = shadow_debug
+        should_attempt_shadow = (
+            bool(shadow_debug.get("qualified"))
+            and bool(shadow_debug.get("has_options_chain"))
+            and (
+                bool(shadow_debug.get("long_call_eligible"))
+                or bool(shadow_debug.get("long_put_eligible"))
+                or str(shadow_debug.get("strategy_type") or "") in {"LONG_CALL", "LONG_PUT"}
+            )
+        )
+
+        if should_attempt_shadow:
+            try:
+                shadow_debug["shadow_attempted"] = True
+                shadow_candidates = build_shadow_single_leg_candidates(
+                    decision=decision,
+                    options_chain=snapshot,
+                    as_of_date=execution_settings.as_of_date,
+                    limit=1,
+                )
+            except Exception:
+                shadow_candidates = []
+                shadow_debug["reason"] = "shadow_builder_exception"
+        else:
+            shadow_candidates = []
+
+        shadow_debug["shadow_candidate_count"] = len(shadow_candidates)
+        if should_attempt_shadow and not shadow_candidates and shadow_debug.get("reason") == "ready":
+            shadow_debug["reason"] = "selector_returned_no_candidates"
+        elif shadow_candidates:
+            shadow_debug["reason"] = "candidates_found"
+
+        if shadow_candidates:
+            shadow_single_leg_candidates_by_symbol[symbol] = shadow_candidates
+
+            existing_debug = options_context_decision_debug.get(symbol)
+            if isinstance(existing_debug, dict):
+                existing_debug["shadow_single_leg_candidates"] = shadow_candidates
+            else:
+                options_context_decision_debug[symbol] = {
+                    "shadow_single_leg_candidates": shadow_candidates,
+                }
 
     regime_history = _infer_recent_regime_history(decisions)
     regime_transition_payload: dict[str, object] = {}
@@ -1168,6 +1233,8 @@ def run_nightly_scan(
             "options_context_run_id": options_context_payload.get("run_id"),
             "options_context_by_symbol": options_context_by_symbol,
             "options_context_decision_debug_by_symbol": options_context_decision_debug,
+            "shadow_single_leg_candidates_by_symbol": shadow_single_leg_candidates_by_symbol,
+            "shadow_single_leg_debug_by_symbol": shadow_single_leg_debug_by_symbol,
             "regime_transition": regime_transition_payload,
             "degraded_live_mode": degraded_live_mode,
             **options_context_summary,
