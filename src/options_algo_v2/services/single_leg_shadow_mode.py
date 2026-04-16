@@ -121,7 +121,7 @@ def build_shadow_single_leg_candidates(
     try:
         candidates = select_single_leg_trade_candidates(
             decision=decision,
-            options_chain=options_chain,
+            chain=options_chain,
             as_of_date=as_of_date,
         )
     except Exception:
