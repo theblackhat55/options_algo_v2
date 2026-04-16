@@ -45,7 +45,12 @@ def build_shadow_single_leg_debug(
     options_chain: OptionsChainSnapshot | None,
 ) -> dict[str, Any]:
     qualified = bool(getattr(decision, "qualified", False))
+
     strategy_type = getattr(decision, "strategy_type", None)
+    if strategy_type is None:
+        candidate = getattr(decision, "candidate", None)
+        strategy_type = getattr(candidate, "strategy_type", None)
+
     strategy_type_value = getattr(strategy_type, "value", str(strategy_type or ""))
 
     long_call_eligible = bool(
